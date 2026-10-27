@@ -114,18 +114,20 @@ export const SpeechControlPanel: React.FC<SpeechControlPanelProps> = ({
 
       {/* Main Controls Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-        {/* 1. Manual Trigger Button with Wave Animation Indicator (3 cols) */}
+        {/* 1. Manual Trigger & Dedicated Stop Speaking Buttons (3 cols) */}
         <div className="lg:col-span-3 flex items-center gap-2">
           <button
-            onClick={isSpeaking ? onStopSpeaking : onSpeakNow}
-            disabled={!sentenceBuffer.trim() && !isSpeaking}
-            className={`flex-1 flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-lg font-mono text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-xs ${
+            type="button"
+            onClick={onSpeakNow}
+            disabled={!sentenceBuffer.trim()}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-mono text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-xs ${
               isSpeaking
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 : sentenceBuffer.trim()
                 ? 'bg-slate-900 hover:bg-slate-800 text-white'
                 : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
             }`}
+            title="Speak current sentence buffer now"
           >
             {isSpeaking ? (
               <>
@@ -136,7 +138,7 @@ export const SpeechControlPanel: React.FC<SpeechControlPanelProps> = ({
                   <span className="w-1 h-3.5 bg-white rounded-full animate-wave-4" />
                   <span className="w-1 h-3.5 bg-white rounded-full animate-wave-5" />
                 </div>
-                <span>Speaking... (Stop)</span>
+                <span>Replay</span>
               </>
             ) : (
               <>
@@ -144,6 +146,20 @@ export const SpeechControlPanel: React.FC<SpeechControlPanelProps> = ({
                 <span>Speak Now</span>
               </>
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={onStopSpeaking}
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg font-mono text-xs font-bold uppercase tracking-wider border transition cursor-pointer ${
+              isSpeaking
+                ? 'bg-rose-600 hover:bg-rose-700 border-rose-600 text-white shadow-xs'
+                : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700'
+            }`}
+            title="Immediately stop speaking and cancel any pending auto-speak timer"
+          >
+            <VolumeX className="w-4 h-4" />
+            <span>Stop</span>
           </button>
         </div>
 

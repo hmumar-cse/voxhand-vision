@@ -204,6 +204,33 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speechWatchdogRef = useRef<number | null>(null);
+
+  const clearSpeechWatchdog = () => {
+    if (speechWatchdogRef.current !== null) {
+      window.clearInterval(speechWatchdogRef.current);
+      speechWatchdogRef.current = null;
+    }
+  };
+
+  const stopSpeech = useCallback(() => {
+    clearSpeechWatchdog();
+    activeUtteranceRef.current = null;
+    hasSpokenSinceLastCommitRef.current = true;
+    lastCommitWallTimeRef.current = 0;
+    setPauseProgressMs(0);
+    setIsSpeaking(false);
+
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        // ignore cancel errors
+      }
+    }
+  }, []);
+
   const triggerSpeech = useCallback((textToSpeak?: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     if (stateRef.current.isMuted || stateRef.current.speechVolume <= 0) return;
@@ -211,8 +238,17 @@ export const App: React.FC = () => {
     const raw = (textToSpeak ?? stateRef.current.sentenceBuffer).trim();
     if (!raw) return;
 
+    // Mark any pending auto-speak pause timer as satisfied so it doesn't interrupt manual speech
+    hasSpokenSinceLastCommitRef.current = true;
+    lastCommitWallTimeRef.current = 0;
+    setPauseProgressMs(0);
+
+    clearSpeechWatchdog();
     window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(raw);
+    activeUtteranceRef.current = utterance;
+
     utterance.volume = Math.max(0, Math.min(1, stateRef.current.speechVolume));
     utterance.rate = stateRef.current.speechRate;
     utterance.pitch = stateRef.current.speechPitch;
@@ -224,18 +260,48 @@ export const App: React.FC = () => {
       utterance.voice = matchedVoice;
     }
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.onstart = () => {
+      if (activeUtteranceRef.current === utterance) {
+        setIsSpeaking(true);
+      }
+    };
+    utterance.onend = () => {
+      if (activeUtteranceRef.current === utterance) {
+        activeUtteranceRef.current = null;
+        clearSpeechWatchdog();
+        setIsSpeaking(false);
+      }
+    };
+    utterance.onerror = () => {
+      if (activeUtteranceRef.current === utterance) {
+        activeUtteranceRef.current = null;
+        clearSpeechWatchdog();
+        setIsSpeaking(false);
+      }
+    };
 
     setIsSpeaking(true);
+    window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
-  }, []);
 
-  const stopSpeech = useCallback(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    setIsSpeaking(false);
+    // Watchdog sync: in Chromium/Windows, onend can occasionally be dropped after cancel().
+    // Poll speechSynthesis.speaking after a 350ms startup grace period to guarantee UI state sync.
+    const startedAt = performance.now();
+    speechWatchdogRef.current = window.setInterval(() => {
+      if (activeUtteranceRef.current !== utterance) {
+        clearSpeechWatchdog();
+        return;
+      }
+      if (
+        performance.now() - startedAt > 400 &&
+        !window.speechSynthesis.speaking &&
+        !window.speechSynthesis.pending
+      ) {
+        activeUtteranceRef.current = null;
+        clearSpeechWatchdog();
+        setIsSpeaking(false);
+      }
+    }, 150);
   }, []);
 
   // --------------------------------------------------------------------------
@@ -271,8 +337,8 @@ export const App: React.FC = () => {
         return next;
       });
 
-      // Speak immediately if user enabled "Speak Every Committed Sign Immediately" or if Emergency sign
-      if (stateRef.current.speakImmediateOnCommit || gestureId === 'EMERGENCY') {
+      // Speak immediately if user enabled "Speak Every Committed Sign Immediately"
+      if (stateRef.current.speakImmediateOnCommit) {
         triggerSpeech(spokenPhrase || token);
       }
 
@@ -636,6 +702,7 @@ export const App: React.FC = () => {
   };
 
   const handleInjectGestureInSim = (gestureId: GestureId) => {
+    debouncerRef.current.releaseLatch();
     setIsSimulating(true);
     setSimulatedGesture(gestureId);
   };
@@ -680,7 +747,10 @@ export const App: React.FC = () => {
               onTogglePause={() => setIsPaused((p) => !p)}
               onResetBuffer={handleResetBuffer}
               onToggleSimulation={() => setIsSimulating((s) => !s)}
-              onSelectSimGesture={(id) => setSimulatedGesture(id)}
+              onSelectSimGesture={(id) => {
+                debouncerRef.current.releaseLatch();
+                setSimulatedGesture(id);
+              }}
               onToggleSimLowConfidence={() =>
                 setSimulatedLowConfidence((low) => !low)
               }

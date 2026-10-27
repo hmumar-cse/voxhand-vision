@@ -16,3 +16,4 @@ An assistive computer vision prototype built with **React 19**, **TypeScript**, 
 npm install
 npm run dev
 ```
+

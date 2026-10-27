@@ -619,9 +619,10 @@ export class GestureHoldDebouncer {
   private candidateId: GestureId = 'NONE';
   private holdStartTs: number | null = null;
   private lastCommitTs = 0;
+  private latchedGestureId: GestureId | null = null;
   private recentPredictions: { id: GestureId; conf: number }[] = [];
 
-  constructor(requiredHoldMs = 600, minConfidence = 0.80, cooldownMs = 450) {
+  constructor(requiredHoldMs = 600, minConfidence = 0.80, cooldownMs = 600) {
     this.requiredHoldMs = requiredHoldMs;
     this.minConfidence = minConfidence;
     this.cooldownMs = cooldownMs;
@@ -631,13 +632,20 @@ export class GestureHoldDebouncer {
     this.candidateId = 'NONE';
     this.holdStartTs = null;
     this.lastCommitTs = 0;
+    this.latchedGestureId = null;
     this.recentPredictions = [];
+  }
+
+  public releaseLatch(): void {
+    this.latchedGestureId = null;
+    this.holdStartTs = null;
   }
 
   public update(classification: ClassificationResult | null, nowMs: number): DebounceState {
     if (!classification || classification.gestureId === 'NONE') {
       this.candidateId = 'NONE';
       this.holdStartTs = null;
+      this.latchedGestureId = null;
       this.recentPredictions = [];
       return {
         candidateId: 'NONE',
@@ -683,14 +691,23 @@ export class GestureHoldDebouncer {
       }
     }
 
+    // Release latch as soon as the user changes to a different gesture
+    if (this.latchedGestureId && smoothedId !== this.latchedGestureId) {
+      this.latchedGestureId = null;
+    }
+
     const meta = GESTURE_CATALOG.find((g) => g.id === smoothedId);
     const displayName = meta ? meta.name : classification.displayName;
     const spokenPhrase = meta ? meta.spokenPhrase : classification.spokenPhrase;
     const token = meta ? meta.token : classification.token;
     const priority = meta ? meta.priority : classification.priority;
 
-    // Check cooldown window after a commit
-    if (this.lastCommitTs > 0 && nowMs - this.lastCommitTs < this.cooldownMs) {
+    // If this exact gesture was already committed and is still being held, stay in COOLDOWN (latched)
+    // so it does not spam the sentence buffer or speech synthesizer every 600ms
+    if (
+      this.latchedGestureId === smoothedId ||
+      (this.lastCommitTs > 0 && nowMs - this.lastCommitTs < this.cooldownMs)
+    ) {
       return {
         candidateId: smoothedId,
         displayName,
@@ -698,9 +715,9 @@ export class GestureHoldDebouncer {
         token,
         priority,
         confidence: smoothedConf,
-        holdDurationMs: 0,
+        holdDurationMs: this.requiredHoldMs,
         requiredHoldMs: this.requiredHoldMs,
-        holdProgress: 0,
+        holdProgress: 1.0,
         status: 'COOLDOWN',
         committedToken: null,
         committedSpokenPhrase: null,
@@ -741,6 +758,7 @@ export class GestureHoldDebouncer {
     if (elapsed >= this.requiredHoldMs) {
       this.holdStartTs = null;
       this.lastCommitTs = nowMs;
+      this.latchedGestureId = smoothedId;
       return {
         candidateId: smoothedId,
         displayName,
