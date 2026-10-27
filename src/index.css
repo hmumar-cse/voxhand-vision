@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace;
+  }
+}
+
+/* Custom audio wave animation */
+@keyframes wavePulse {
+  0%, 100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.animate-wave-1 {
+  animation: wavePulse 0.75s ease-in-out infinite;
+}
+.animate-wave-2 {
+  animation: wavePulse 0.75s ease-in-out 0.15s infinite;
+}
+.animate-wave-3 {
+  animation: wavePulse 0.75s ease-in-out 0.3s infinite;
+}
+.animate-wave-4 {
+  animation: wavePulse 0.75s ease-in-out 0.45s infinite;
+}
+.animate-wave-5 {
+  animation: wavePulse 0.75s ease-in-out 0.2s infinite;
+}
+
