@@ -103,8 +103,8 @@ export const App: React.FC = () => {
   ]);
   const [sentenceBuffer, setSentenceBuffer] = useState<string>('HELLO ');
 
-  // Speech & Audio Synthesis state (including Volume + Mute)
-  const [autoSpeak, setAutoSpeak] = useState<boolean>(true);
+  // Speech & Audio Synthesis state (Manual button trigger by default)
+  const [autoSpeak, setAutoSpeak] = useState<boolean>(false);
   const [speakImmediateOnCommit, setSpeakImmediateOnCommit] =
     useState<boolean>(false);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
@@ -747,6 +747,9 @@ export const App: React.FC = () => {
             <TranslationConsole
               tokenHistory={tokenHistory}
               sentenceBuffer={sentenceBuffer}
+              isSpeaking={isSpeaking}
+              onSpeakSentence={() => triggerSpeech(sentenceBuffer)}
+              onStopSpeaking={stopSpeech}
               onChangeSentence={setSentenceBuffer}
               onClearSentence={handleResetBuffer}
               onAppendSpace={() => setSentenceBuffer((s) => s + ' ')}

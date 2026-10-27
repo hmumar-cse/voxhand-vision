@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  AudioWaveform,
   Check,
   Copy,
   CornerDownLeft,
@@ -9,12 +10,17 @@ import {
   Sparkles,
   Terminal,
   Trash2,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { AccumulatedToken } from '../types/voxhand';
 
 interface TranslationConsoleProps {
   tokenHistory: AccumulatedToken[];
   sentenceBuffer: string;
+  isSpeaking: boolean;
+  onSpeakSentence: () => void;
+  onStopSpeaking: () => void;
   onChangeSentence: (val: string) => void;
   onClearSentence: () => void;
   onAppendSpace: () => void;
@@ -25,6 +31,9 @@ interface TranslationConsoleProps {
 export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
   tokenHistory,
   sentenceBuffer,
+  isSpeaking,
+  onSpeakSentence,
+  onStopSpeaking,
   onChangeSentence,
   onClearSentence,
   onAppendSpace,
@@ -106,7 +115,7 @@ export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
         </div>
       </div>
 
-      {/* 2. Text Output Screen (Terminal-Style Display) */}
+      {/* 2. Text Output Screen (Terminal-Style Display) + Read Full Sentence Button */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex-1 flex flex-col justify-between">
         <div className="flex-1 flex flex-col">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
@@ -171,19 +180,67 @@ export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
             <textarea
               value={sentenceBuffer}
               onChange={(e) => onChangeSentence(e.target.value)}
-              rows={8}
-              placeholder="Translated sign language words appear here... (Editable)"
-              className="w-full flex-1 min-h-[240px] rounded-xl bg-slate-950 text-emerald-400 font-mono text-lg sm:text-xl p-4 border border-slate-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none leading-relaxed"
+              rows={7}
+              placeholder="Translated sign language words appear here... Press 'Read Full Sentence' below to speak aloud."
+              className="w-full flex-1 min-h-[210px] rounded-xl bg-slate-950 text-emerald-400 font-mono text-lg sm:text-xl p-4 border border-slate-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none leading-relaxed"
             />
             <div className="absolute bottom-3 right-3.5 flex items-center gap-1.5 text-[11px] font-mono text-slate-400 pointer-events-none">
               <CornerDownLeft className="w-3 h-3" />
               <span>{sentenceBuffer.length} chars</span>
             </div>
           </div>
+
+          {/* Dedicated "Read Full Sentence" Trigger Bar directly under Text Generation */}
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onSpeakSentence}
+              disabled={!sentenceBuffer.trim()}
+              className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-mono text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm ${
+                isSpeaking
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : sentenceBuffer.trim()
+                  ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                  : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+              }`}
+              title="Read the full generated sentence aloud"
+            >
+              {isSpeaking ? (
+                <>
+                  <div className="flex items-center gap-0.5 h-4">
+                    <span className="w-1 h-3.5 bg-white rounded-full animate-wave-1" />
+                    <span className="w-1 h-3.5 bg-white rounded-full animate-wave-2" />
+                    <span className="w-1 h-3.5 bg-white rounded-full animate-wave-3" />
+                    <span className="w-1 h-3.5 bg-white rounded-full animate-wave-4" />
+                    <span className="w-1 h-3.5 bg-white rounded-full animate-wave-5" />
+                  </div>
+                  <span>Reading Sentence Aloud... (Click to Replay)</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-4 h-4 text-emerald-400" />
+                  <AudioWaveform className="w-4 h-4 text-emerald-400" />
+                  <span>Read Full Sentence</span>
+                </>
+              )}
+            </button>
+
+            {isSpeaking && (
+              <button
+                type="button"
+                onClick={onStopSpeaking}
+                className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl font-mono text-xs sm:text-sm font-bold uppercase tracking-wider bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition-all cursor-pointer"
+                title="Stop reading immediately"
+              >
+                <VolumeX className="w-4 h-4" />
+                <span>Stop</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-slate-500">
-          <span>3D Skeletal Hand Tracking &rarr; Word Translation</span>
+          <span>Manual Speech Trigger: Speaks only when button is pressed</span>
           <span className="text-slate-700 font-semibold">
             15 Mandatory Word Signs
           </span>
