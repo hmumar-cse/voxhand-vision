@@ -64,13 +64,15 @@ export const SpeechControlPanel: React.FC<SpeechControlPanelProps> = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
       {/* Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 mb-3.5">
-        <div className="flex items-center gap-2">
-          <Volume2 className="w-4 h-4 text-slate-800" />
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
-            Speech &amp; Audio Control Panel (Volume, Rate, Pitch &amp; Web Speech TTS)
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center">
+            <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
+            Speech &amp; Audio Synthesizer Console (Volume, Speed, Pitch &amp; System TTS)
           </h2>
         </div>
 

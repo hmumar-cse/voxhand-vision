@@ -125,9 +125,9 @@ export const GestureReferenceDrawer: React.FC<GestureReferenceDrawerProps> = ({
     customSamples.filter((s) => s.gestureId === id).length;
 
   return (
-    <section className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+    <section className="bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
       {/* Collapsible Header Bar */}
-      <div className="px-4 py-3 bg-slate-50/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+      <div className="px-4 py-3.5 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/90 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center gap-2 text-left cursor-pointer"

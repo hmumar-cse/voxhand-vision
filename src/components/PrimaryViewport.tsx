@@ -86,11 +86,21 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
 
     // Draw background grid if in Synthetic Simulation Mode or Standby
     if (telemetry.cameraStatus !== 'ACTIVE' || isSimulating) {
-      ctx.fillStyle = '#0f172a';
+      const grad = ctx.createRadialGradient(
+        w * 0.5,
+        h * 0.5,
+        40,
+        w * 0.5,
+        h * 0.5,
+        w * 0.7
+      );
+      grad.addColorStop(0, '#0f172a');
+      grad.addColorStop(1, '#020617');
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
 
       // Subtle technical grid
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
       ctx.lineWidth = 1;
       const step = 32;
       for (let x = 0; x < w; x += step) {
@@ -114,18 +124,34 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
         p[1] * h,
       ]);
 
+      const isHighConf = debounceState.confidence >= 0.8;
+      const isEmergency =
+        debounceState.priority === 'CRITICAL' && isHighConf;
+
       // 1. Draw Skeletal Landmark Overlay (if enabled)
       if (showLandmarks) {
-        // Joint connecting bones
-        ctx.lineWidth = 2.75;
-        ctx.strokeStyle =
-          debounceState.confidence >= 0.8 ? '#10b981' : '#f59e0b';
+        // Joint connecting bones with subtle glow
+        ctx.save();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = isEmergency
+          ? '#f43f5e'
+          : isHighConf
+          ? '#10b981'
+          : '#f59e0b';
+        ctx.shadowColor = isEmergency
+          ? 'rgba(244, 63, 94, 0.45)'
+          : isHighConf
+          ? 'rgba(16, 185, 129, 0.45)'
+          : 'rgba(245, 158, 11, 0.4)';
+        ctx.shadowBlur = 8;
+
         for (const [a, b] of HAND_CONNECTIONS) {
           ctx.beginPath();
           ctx.moveTo(pts[a][0], pts[a][1]);
           ctx.lineTo(pts[b][0], pts[b][1]);
           ctx.stroke();
         }
+        ctx.restore();
 
         // 21 Landmark Nodes
         for (let i = 0; i < pts.length; i++) {
@@ -162,25 +188,28 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
         if (py > maxY) maxY = py;
       }
 
-      const pad = 26;
+      const pad = 28;
       const bx = Math.max(8, minX - pad);
-      const by = Math.max(38, minY - pad);
+      const by = Math.max(42, minY - pad);
       const bw = Math.min(w - bx - 8, maxX - minX + pad * 2);
       const bh = Math.min(h - by - 8, maxY - minY + pad * 2);
 
-      const isHighConf = debounceState.confidence >= 0.8;
-      const boxColor = isHighConf ? '#10b981' : '#f59e0b';
+      const boxColor = isEmergency
+        ? '#f43f5e'
+        : isHighConf
+        ? '#10b981'
+        : '#f59e0b';
 
       // Dashed bounding box
       ctx.save();
       ctx.strokeStyle = boxColor;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 4]);
       ctx.strokeRect(bx, by, bw, bh);
       ctx.restore();
 
       // Corner brackets for precision optical look
-      const cornerLen = 12;
+      const cornerLen = 14;
       ctx.strokeStyle = boxColor;
       ctx.lineWidth = 3;
       // Top-left
@@ -208,29 +237,31 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
       ctx.lineTo(bx + bw, by + bh - cornerLen);
       ctx.stroke();
 
-      // 3. Inline Tag above bounding box: [Detected Gesture: <Name>]
+      // 3. Inline Tag above bounding box: [Detected Sign: <Name>]
       const tagText = `[Detected Sign: ${debounceState.displayName}]`;
       ctx.font = '600 12px "JetBrains Mono", Consolas, monospace';
       const textWidth = ctx.measureText(tagText).width;
-      const tagW = textWidth + 18;
+      const tagW = textWidth + 20;
       const tagH = 26;
       const tagX = Math.min(Math.max(8, bx), w - tagW - 8);
-      const tagY = Math.max(6, by - tagH - 4);
+      const tagY = Math.max(8, by - tagH - 6);
 
-      ctx.fillStyle = isHighConf
-        ? 'rgba(6, 78, 59, 0.92)'
-        : 'rgba(120, 53, 15, 0.92)';
+      ctx.fillStyle = isEmergency
+        ? 'rgba(136, 19, 55, 0.94)'
+        : isHighConf
+        ? 'rgba(6, 78, 59, 0.94)'
+        : 'rgba(120, 53, 15, 0.94)';
       ctx.fillRect(tagX, tagY, tagW, tagH);
       ctx.strokeStyle = boxColor;
       ctx.lineWidth = 1.5;
       ctx.strokeRect(tagX, tagY, tagW, tagH);
 
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(tagText, tagX + 9, tagY + 17);
+      ctx.fillText(tagText, tagX + 10, tagY + 17);
 
       // 600ms Hold Progress micro-bar directly along bottom of tag
       if (debounceState.holdProgress > 0) {
-        ctx.fillStyle = '#34d399';
+        ctx.fillStyle = isEmergency ? '#fb7185' : '#34d399';
         ctx.fillRect(
           tagX,
           tagY + tagH - 3,
@@ -254,29 +285,31 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
   const isWebcamLive = telemetry.cameraStatus === 'ACTIVE';
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-xs flex flex-col overflow-hidden h-full">
+    <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm flex flex-col overflow-hidden h-full">
       {/* Top Card Subheader */}
-      <div className="px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50/60">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-slate-900"></span>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
-            Primary Optical Viewport (21-Keypoint Skeletal Overlay)
+      <div className="px-4 py-3 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/90">
+        <div className="flex items-center gap-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-900 ring-4 ring-slate-900/10" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
+            Primary Optical Viewport &middot; 21-Keypoint 3D Hand Mesh
           </h2>
         </div>
 
         <div className="flex items-center gap-2">
           {!isWebcamLive ? (
             <button
+              type="button"
               onClick={onStartCamera}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs"
             >
-              <Camera className="w-3.5 h-3.5" />
+              <Camera className="w-3.5 h-3.5 text-emerald-400" />
               <span>Enable Live Webcam</span>
             </button>
           ) : (
             <button
+              type="button"
               onClick={onStopCamera}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs"
             >
               <CameraOff className="w-3.5 h-3.5" />
               <span>Stop Webcam</span>
@@ -284,10 +317,11 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
           )}
 
           <button
+            type="button"
             onClick={onToggleSimulation}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono border transition cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono border transition-all cursor-pointer ${
               isSimulating
-                ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold'
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-950 font-semibold shadow-2xs'
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
             }`}
             title="Run real-time 21-point synthetic hand kinematics through the exact MediaPipe classifier when testing without a physical camera"
@@ -299,14 +333,16 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
       </div>
 
       {/* Video & Absolute Canvas Container */}
-      <div className="relative flex-1 bg-slate-950 min-h-[380px] sm:min-h-[450px] flex items-center justify-center overflow-hidden">
+      <div className="relative flex-1 bg-slate-950 min-h-[390px] sm:min-h-[460px] flex items-center justify-center overflow-hidden">
         {/* Mirrored Live Camera Feed */}
         <video
           ref={videoRef}
           playsInline
           muted
           className={`w-full h-full object-contain max-h-[540px] transition-opacity duration-200 ${
-            isWebcamLive && !isSimulating ? 'opacity-100' : 'opacity-0 pointer-events-none absolute'
+            isWebcamLive && !isSimulating
+              ? 'opacity-100'
+              : 'opacity-0 pointer-events-none absolute'
           } ${isMirrored ? '-scale-x-100' : ''}`}
         />
 
@@ -319,54 +355,70 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
         />
 
         {/* Top-Left Live Telemetry HUD Pill inside Viewport */}
-        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-2 pointer-events-none">
-          <div className="px-2.5 py-1 rounded-md bg-slate-900/85 backdrop-blur-xs border border-slate-700 text-[11px] font-mono text-slate-200 flex items-center gap-2">
+        <div className="absolute top-3.5 left-3.5 flex flex-wrap items-center gap-2 pointer-events-none">
+          <div className="px-3 py-1.5 rounded-lg bg-slate-900/85 backdrop-blur-md border border-slate-700/80 text-[11px] font-mono text-slate-200 flex items-center gap-2.5 shadow-md">
             <span>
-              HOLD DEBOUNCE:{' '}
+              HOLD BUFFER:{' '}
               <strong className="text-emerald-400">
                 {Math.round(debounceState.holdDurationMs)}ms
               </strong>{' '}
               / {debounceState.requiredHoldMs}ms
             </span>
-            <span className="text-slate-500">|</span>
+            <span className="text-slate-600">|</span>
             <span>
               SPAN:{' '}
               <strong className="text-sky-300">
                 {features ? features.palmSpan.toFixed(3) : '0.000'}
               </strong>
             </span>
+            {features && (
+              <>
+                <span className="text-slate-600">|</span>
+                <span>
+                  ROLL:{' '}
+                  <strong className="text-indigo-300">
+                    {features.handRollDeg.toFixed(0)}&deg;
+                  </strong>
+                </span>
+              </>
+            )}
           </div>
         </div>
 
         {/* Camera Error Banner if User Denied / No Webcam */}
         {cameraError && (
-          <div className="absolute top-12 left-3 right-3 bg-amber-950/90 border border-amber-500/60 text-amber-100 px-3 py-2 rounded-lg text-xs font-mono flex items-center justify-between">
+          <div className="absolute top-14 left-3.5 right-3.5 bg-amber-950/90 backdrop-blur-xs border border-amber-500/60 text-amber-100 px-3.5 py-2 rounded-lg text-xs font-mono flex items-center justify-between shadow-lg">
             <span>
-              Webcam notice: {cameraError} — Running deterministic 21-keypoint kinematic emulation so all pipeline stages can be validated.
+              Webcam notice: {cameraError} — Running deterministic 21-keypoint
+              kinematic emulation so all pipeline stages can be validated.
             </span>
           </div>
         )}
 
         {/* Standby Empty State if neither Webcam nor SimBench is running */}
         {!isWebcamLive && !isSimulating && (
-          <div className="relative z-10 text-center max-w-md px-6 py-8 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 shadow-lg">
-            <Camera className="w-8 h-8 text-slate-400 mx-auto mb-2.5" />
+          <div className="relative z-10 text-center max-w-md px-6 py-8 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800 text-slate-200 shadow-xl">
+            <Camera className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-white mb-1">
               Optical Feed in Standby
             </h3>
             <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-              Start your webcam for live 30+ FPS MediaPipe Hands skeletal tracking, or enable the Synthetic Kinematic Bench to test gestures deterministically.
+              Start your webcam for live 30+ FPS MediaPipe Hands skeletal
+              tracking, or enable the Synthetic Kinematic Bench to test gestures
+              deterministically.
             </p>
             <div className="flex items-center justify-center gap-2.5">
               <button
+                type="button"
                 onClick={onStartCamera}
-                className="px-3.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition cursor-pointer"
               >
                 Start Live Webcam
               </button>
               <button
+                type="button"
                 onClick={onToggleSimulation}
-                className="px-3.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-mono transition cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-mono transition cursor-pointer"
               >
                 Launch Kinematic SimBench
               </button>
@@ -375,12 +427,13 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
         )}
 
         {/* Floating Video Control Pills (Bottom Center) */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900/90 backdrop-blur-md border border-slate-700/80 shadow-lg">
+        <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 backdrop-blur-md border border-slate-700/80 shadow-xl">
           <button
+            type="button"
             onClick={onToggleMirror}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
               isMirrored
-                ? 'bg-slate-700 text-white'
+                ? 'bg-slate-700 text-white shadow-2xs'
                 : 'text-slate-300 hover:bg-slate-800'
             }`}
             title="Flip Camera Horizontally"
@@ -390,10 +443,11 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={onToggleLandmarks}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
               showLandmarks
-                ? 'bg-emerald-600/90 text-white'
+                ? 'bg-emerald-600 text-white shadow-2xs'
                 : 'text-slate-300 hover:bg-slate-800'
             }`}
             title="Toggle 21-Point Skeletal Landmarks Overlay"
@@ -407,10 +461,11 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={onTogglePause}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
               isPaused
-                ? 'bg-amber-600 text-white'
+                ? 'bg-amber-600 text-white shadow-2xs'
                 : 'text-slate-300 hover:bg-slate-800'
             }`}
             title="Pause / Resume Optical Inference Feed"
@@ -424,8 +479,9 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={onResetBuffer}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-rose-300 hover:bg-rose-950/60 hover:text-rose-200 transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-rose-300 hover:bg-rose-950/70 hover:text-rose-200 transition-all cursor-pointer"
             title="Reset Gesture Accumulator & Sentence Buffer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -434,42 +490,50 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
         </div>
       </div>
 
-      {/* Kinematic Simulation Selector Bar (Visible when SimBench is active so evaluators can test any gesture or <80% confidence) */}
+      {/* Kinematic Simulation Selector Bar */}
       {isSimulating && (
-        <div className="px-4 py-2.5 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div className="px-4 py-2.5 bg-slate-50/90 border-t border-slate-200/90 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-xs font-mono text-slate-600">
             <Sliders className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="font-semibold text-slate-800">INJECT POSE:</span>
+            <span className="font-bold text-slate-800">INJECT SIGN:</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1">
-            {GESTURE_CATALOG.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => onSelectSimGesture(g.id)}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer ${
-                  simulatedGesture === g.id
-                    ? 'bg-slate-900 text-white font-bold shadow-2xs'
-                    : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
-                }`}
-              >
-                {g.id}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {GESTURE_CATALOG.map((g) => {
+              const isSelected = simulatedGesture === g.id;
+              const isEmergency = g.priority === 'CRITICAL';
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => onSelectSimGesture(g.id)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all cursor-pointer ${
+                    isSelected
+                      ? isEmergency
+                        ? 'bg-rose-600 text-white font-bold shadow-xs'
+                        : 'bg-slate-900 text-white font-bold shadow-xs'
+                      : isEmergency
+                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200'
+                      : 'bg-white hover:bg-slate-200/70 text-slate-700 border border-slate-200/90'
+                  }`}
+                >
+                  {g.id}
+                </button>
+              );
+            })}
           </div>
 
           <button
+            type="button"
             onClick={onToggleSimLowConfidence}
-            className={`px-2.5 py-1 rounded text-[11px] font-mono border transition cursor-pointer ${
+            className={`px-2.5 py-1 rounded-md text-[11px] font-mono border transition-all cursor-pointer ${
               simulatedLowConfidence
                 ? 'bg-amber-100 border-amber-400 text-amber-900 font-semibold'
-                : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-200'
+                : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-200/70'
             }`}
-            title="Simulate ambiguous hand posture (<80% confidence) to verify the Amber Low-Confidence gate"
+            title="Simulate unclear hand posture to verify the Amber Posture Warning state"
           >
-            {simulatedLowConfidence
-              ? 'Sim Ambiguous (<80%): ON'
-              : 'Test <80% Gate'}
+            {simulatedLowConfidence ? 'Unclear Pose: ON' : 'Test Unclear Pose'}
           </button>
         </div>
       )}
