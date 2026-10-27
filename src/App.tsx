@@ -51,7 +51,6 @@ export const App: React.FC = () => {
   const [isSimulating, setIsSimulating] = useState(true);
   const [simulatedGesture, setSimulatedGesture] =
     useState<GestureId>('EMERGENCY');
-  const [simulatedLowConfidence, setSimulatedLowConfidence] = useState(false);
   const [isMirrored, setIsMirrored] = useState(true);
   const [showLandmarks, setShowLandmarks] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
@@ -123,7 +122,6 @@ export const App: React.FC = () => {
     isSimulating,
     isWebcamRunning,
     simulatedGesture,
-    simulatedLowConfidence,
     calibration,
     customSamples,
     autoSpeak,
@@ -143,7 +141,6 @@ export const App: React.FC = () => {
       isSimulating,
       isWebcamRunning,
       simulatedGesture,
-      simulatedLowConfidence,
       calibration,
       customSamples,
       autoSpeak,
@@ -161,7 +158,6 @@ export const App: React.FC = () => {
     isSimulating,
     isWebcamRunning,
     simulatedGesture,
-    simulatedLowConfidence,
     calibration,
     customSamples,
     autoSpeak,
@@ -417,16 +413,9 @@ export const App: React.FC = () => {
         stateRef.current.calibration
       );
 
-      // If user toggled "Test <80% Gate" in SimBench, apply negative confidence offset to demonstrate amber warning
-      const confOffset =
-        sourceMode === 'SIMULATION' && stateRef.current.simulatedLowConfidence
-          ? -0.25
-          : 0.0;
-
       const classification = classifyGesture(
         extracted,
-        stateRef.current.customSamples,
-        confOffset
+        stateRef.current.customSamples
       );
 
       const deb = debouncerRef.current.update(classification, nowMs);
@@ -739,7 +728,6 @@ export const App: React.FC = () => {
               isPaused={isPaused}
               isSimulating={isSimulating}
               simulatedGesture={simulatedGesture}
-              simulatedLowConfidence={simulatedLowConfidence}
               onStartCamera={startWebcam}
               onStopCamera={stopWebcam}
               onToggleMirror={() => setIsMirrored((m) => !m)}
@@ -751,17 +739,12 @@ export const App: React.FC = () => {
                 debouncerRef.current.releaseLatch();
                 setSimulatedGesture(id);
               }}
-              onToggleSimLowConfidence={() =>
-                setSimulatedLowConfidence((low) => !low)
-              }
               cameraError={cameraError}
             />
           </div>
 
           <div className="lg:col-span-5 flex flex-col">
             <TranslationConsole
-              debounceState={debounceState}
-              features={features}
               tokenHistory={tokenHistory}
               sentenceBuffer={sentenceBuffer}
               onChangeSentence={setSentenceBuffer}

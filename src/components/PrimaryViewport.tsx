@@ -36,7 +36,6 @@ interface PrimaryViewportProps {
   isPaused: boolean;
   isSimulating: boolean;
   simulatedGesture: GestureId;
-  simulatedLowConfidence: boolean;
   onStartCamera: () => void;
   onStopCamera: () => void;
   onToggleMirror: () => void;
@@ -45,7 +44,6 @@ interface PrimaryViewportProps {
   onResetBuffer: () => void;
   onToggleSimulation: () => void;
   onSelectSimGesture: (id: GestureId) => void;
-  onToggleSimLowConfidence: () => void;
   cameraError: string | null;
 }
 
@@ -60,7 +58,6 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
   isPaused,
   isSimulating,
   simulatedGesture,
-  simulatedLowConfidence,
   onStartCamera,
   onStopCamera,
   onToggleMirror,
@@ -69,7 +66,6 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
   onResetBuffer,
   onToggleSimulation,
   onSelectSimGesture,
-  onToggleSimLowConfidence,
   cameraError,
 }) => {
   // Draw overlay on canvas whenever features or debounceState updates
@@ -174,100 +170,6 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
           ctx.strokeStyle = '#0f172a';
           ctx.stroke();
         }
-      }
-
-      // 2. Dynamic Bounding Box surrounding the detected hand
-      let minX = w,
-        minY = h,
-        maxX = 0,
-        maxY = 0;
-      for (const [px, py] of pts) {
-        if (px < minX) minX = px;
-        if (py < minY) minY = py;
-        if (px > maxX) maxX = px;
-        if (py > maxY) maxY = py;
-      }
-
-      const pad = 28;
-      const bx = Math.max(8, minX - pad);
-      const by = Math.max(42, minY - pad);
-      const bw = Math.min(w - bx - 8, maxX - minX + pad * 2);
-      const bh = Math.min(h - by - 8, maxY - minY + pad * 2);
-
-      const boxColor = isEmergency
-        ? '#f43f5e'
-        : isHighConf
-        ? '#10b981'
-        : '#f59e0b';
-
-      // Dashed bounding box
-      ctx.save();
-      ctx.strokeStyle = boxColor;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([6, 4]);
-      ctx.strokeRect(bx, by, bw, bh);
-      ctx.restore();
-
-      // Corner brackets for precision optical look
-      const cornerLen = 14;
-      ctx.strokeStyle = boxColor;
-      ctx.lineWidth = 3;
-      // Top-left
-      ctx.beginPath();
-      ctx.moveTo(bx, by + cornerLen);
-      ctx.lineTo(bx, by);
-      ctx.lineTo(bx + cornerLen, by);
-      ctx.stroke();
-      // Top-right
-      ctx.beginPath();
-      ctx.moveTo(bx + bw - cornerLen, by);
-      ctx.lineTo(bx + bw, by);
-      ctx.lineTo(bx + bw, by + cornerLen);
-      ctx.stroke();
-      // Bottom-left
-      ctx.beginPath();
-      ctx.moveTo(bx, by + bh - cornerLen);
-      ctx.lineTo(bx, by + bh);
-      ctx.lineTo(bx + cornerLen, by + bh);
-      ctx.stroke();
-      // Bottom-right
-      ctx.beginPath();
-      ctx.moveTo(bx + bw - cornerLen, by + bh);
-      ctx.lineTo(bx + bw, by + bh);
-      ctx.lineTo(bx + bw, by + bh - cornerLen);
-      ctx.stroke();
-
-      // 3. Inline Tag above bounding box: [Detected Sign: <Name>]
-      const tagText = `[Detected Sign: ${debounceState.displayName}]`;
-      ctx.font = '600 12px "JetBrains Mono", Consolas, monospace';
-      const textWidth = ctx.measureText(tagText).width;
-      const tagW = textWidth + 20;
-      const tagH = 26;
-      const tagX = Math.min(Math.max(8, bx), w - tagW - 8);
-      const tagY = Math.max(8, by - tagH - 6);
-
-      ctx.fillStyle = isEmergency
-        ? 'rgba(136, 19, 55, 0.94)'
-        : isHighConf
-        ? 'rgba(6, 78, 59, 0.94)'
-        : 'rgba(120, 53, 15, 0.94)';
-      ctx.fillRect(tagX, tagY, tagW, tagH);
-      ctx.strokeStyle = boxColor;
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(tagX, tagY, tagW, tagH);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(tagText, tagX + 10, tagY + 17);
-
-      // 600ms Hold Progress micro-bar directly along bottom of tag
-      if (debounceState.holdProgress > 0) {
-        ctx.fillStyle = isEmergency ? '#fb7185' : '#34d399';
-        ctx.fillRect(
-          tagX,
-          tagY + tagH - 3,
-          tagW * debounceState.holdProgress,
-          3
-        );
       }
     }
 
@@ -522,19 +424,6 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
               );
             })}
           </div>
-
-          <button
-            type="button"
-            onClick={onToggleSimLowConfidence}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-mono border transition-all cursor-pointer ${
-              simulatedLowConfidence
-                ? 'bg-amber-100 border-amber-400 text-amber-900 font-semibold'
-                : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-200/70'
-            }`}
-            title="Simulate unclear hand posture to verify the Amber Posture Warning state"
-          >
-            {simulatedLowConfidence ? 'Unclear Pose: ON' : 'Test Unclear Pose'}
-          </button>
         </div>
       )}
     </div>
