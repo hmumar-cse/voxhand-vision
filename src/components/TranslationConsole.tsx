@@ -43,7 +43,6 @@ export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
-  const confidencePct = Math.round(debounceState.confidence * 100);
   const isHighConfidence = debounceState.confidence >= 0.80;
   const hasCandidate = debounceState.candidateId !== 'NONE';
   const isCriticalEmergency =
@@ -60,15 +59,9 @@ export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
     }
   };
 
-  // Circular SVG gauge geometry
-  const radius = 34;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset =
-    circumference - (Math.min(100, confidencePct) / 100) * circumference;
-
   return (
     <div className="flex flex-col gap-4 h-full">
-      {/* 1. Real-Time Confidence Gauge Card */}
+      {/* 1. Real-Time Sign Recognition & Posture Status Card (No Percentage Score) */}
       <div
         className={`bg-white border rounded-xl p-4 shadow-xs transition-colors ${
           isCriticalEmergency ? 'border-rose-300 bg-rose-50/15' : 'border-slate-200'
@@ -82,153 +75,99 @@ export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
               }`}
             />
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
-              Real-Time Confidence Gauge (Word-Level Classifier)
+              Real-Time Sign Recognition Status
             </h2>
           </div>
           <span className="text-[11px] font-mono text-slate-500">
-            Threshold Gate: &ge;80%
+            Posture Stability Monitor
           </span>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          {/* Circular Gauge */}
-          <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
-            <svg className="w-24 h-24 -rotate-90" viewBox="0 0 84 84">
-              <circle
-                cx="42"
-                cy="42"
-                r={radius}
-                fill="transparent"
-                stroke="#f1f5f9"
-                strokeWidth="8"
-              />
-              <circle
-                cx="42"
-                cy="42"
-                r={radius}
-                fill="transparent"
-                stroke={
-                  !hasCandidate
-                    ? '#94a3b8'
-                    : isCriticalEmergency
-                    ? '#e11d48'
-                    : isHighConfidence
-                    ? '#10b981'
-                    : '#f59e0b'
-                }
-                strokeWidth="8"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                className="transition-all duration-150"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-lg font-bold font-mono text-slate-900">
-                {hasCandidate ? `${confidencePct}%` : '--'}
-              </span>
-              <span className="text-[10px] font-mono uppercase text-slate-400">
-                Score
+        <div className="space-y-3">
+          {/* Detected Sign & Spoken Phrase */}
+          <div className="flex items-center justify-between text-xs gap-2">
+            <span className="font-mono text-slate-500 shrink-0">
+              Detected Sign:
+            </span>
+            <div className="flex items-center gap-1.5 truncate">
+              {isCriticalEmergency && (
+                <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-mono font-bold uppercase">
+                  URGENT
+                </span>
+              )}
+              <span className="font-mono font-bold text-slate-900 px-2.5 py-1 rounded bg-slate-100 border border-slate-200 truncate">
+                {hasCandidate ? debounceState.displayName : 'Awaiting Hand...'}
               </span>
             </div>
           </div>
 
-          {/* Linear Progress Meter & Abstract Status Alert */}
-          <div className="flex-1 w-full space-y-2.5">
-            <div className="flex items-center justify-between text-xs gap-2">
-              <span className="font-mono text-slate-500 shrink-0">
-                Detected Sign:
-              </span>
-              <div className="flex items-center gap-1.5 truncate">
-                {isCriticalEmergency && (
-                  <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-mono font-bold uppercase">
-                    URGENT
-                  </span>
-                )}
-                <span className="font-mono font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100 border border-slate-200 truncate">
-                  {hasCandidate ? debounceState.displayName : 'Awaiting Hand...'}
-                </span>
-              </div>
+          {hasCandidate && debounceState.spokenPhrase && (
+            <div className="text-xs font-mono text-slate-600 bg-slate-50 px-3 py-1.5 rounded border border-slate-200/80 truncate">
+              Phrase:{' '}
+              <strong className="text-slate-900">
+                &ldquo;{debounceState.spokenPhrase}&rdquo;
+              </strong>
             </div>
+          )}
 
-            {hasCandidate && debounceState.spokenPhrase && (
-              <div className="text-[11px] font-mono text-slate-600 bg-slate-50 px-2.5 py-1 rounded border border-slate-200/80 truncate">
-                Phrase: <strong className="text-slate-900">&ldquo;{debounceState.spokenPhrase}&rdquo;</strong>
-              </div>
-            )}
-
-            {/* Linear Progress Bar with 80% Threshold Marker */}
-            <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+          {/* Hold Debounce Progress Bar (600ms) */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px] font-mono text-slate-500">
+              <span>600ms Stability Hold Buffer</span>
+              <span>
+                {Math.round(debounceState.holdDurationMs)} /{' '}
+                {debounceState.requiredHoldMs} ms
+              </span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200/80">
               <div
-                className={`h-full transition-all duration-150 ${
-                  !hasCandidate
-                    ? 'bg-slate-300'
-                    : isCriticalEmergency
+                className={`h-full transition-all duration-75 ${
+                  isCriticalEmergency
                     ? 'bg-rose-600'
                     : isHighConfidence
-                    ? 'bg-emerald-500'
-                    : 'bg-amber-500'
+                    ? 'bg-emerald-600'
+                    : 'bg-slate-900'
                 }`}
-                style={{ width: `${hasCandidate ? confidencePct : 0}%` }}
-              />
-              {/* 80% Cutoff Line */}
-              <div
-                className="absolute top-0 bottom-0 w-0.5 bg-slate-900/70"
-                style={{ left: '80%' }}
-                title="80% Verification Gate"
+                style={{
+                  width: `${Math.round(debounceState.holdProgress * 100)}%`,
+                }}
               />
             </div>
-
-            {/* Hold Debounce Progress Bar (600ms) */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-mono text-slate-500">
-                <span>600ms Temporal Hold Buffer</span>
-                <span>
-                  {Math.round(debounceState.holdDurationMs)} /{' '}
-                  {debounceState.requiredHoldMs} ms
-                </span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-slate-900 transition-all duration-75"
-                  style={{ width: `${Math.round(debounceState.holdProgress * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Status Banner matching Abstract Logic */}
-            {!hasCandidate ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs">
-                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                <span>Standby: Position hand in viewport for word recognition</span>
-              </div>
-            ) : isHighConfidence ? (
-              <div
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium ${
-                  isCriticalEmergency
-                    ? 'bg-rose-50 border-rose-300 text-rose-950'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                }`}
-              >
-                {isCriticalEmergency ? (
-                  <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                )}
-                <span>
-                  <strong>Verified Output</strong> (&ge;80% Confidence Gate Passed)
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs font-medium">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Low Confidence:</strong> Adjust hand posture or repeat
-                  gesture
-                </span>
-              </div>
-            )}
           </div>
+
+          {/* Status Banner */}
+          {!hasCandidate ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs">
+              <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span>Standby: Position hand in viewport for word recognition</span>
+            </div>
+          ) : isHighConfidence ? (
+            <div
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium ${
+                isCriticalEmergency
+                  ? 'bg-rose-50 border-rose-300 text-rose-950'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              }`}
+            >
+              {isCriticalEmergency ? (
+                <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              )}
+              <span>
+                <strong>Verified Output:</strong> Hand posture locked &amp;
+                verified
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs font-medium">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Posture Unclear:</strong> Adjust hand posture or repeat
+                gesture
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Finger Curl Angle Telemetry Strip */}
@@ -279,8 +218,8 @@ export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
         <div className="min-h-[54px] p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center gap-1.5 overflow-x-auto">
           {tokenHistory.length === 0 ? (
             <span className="text-xs font-mono text-slate-400">
-              Hold a verified sign (&ge;80%) for 600ms to append mandatory word
-              tokens (e.g. &ldquo;EMERGENCY&rdquo; &rarr; &ldquo;HELP&rdquo; &rarr;
+              Hold a verified sign for 600ms to append mandatory word tokens
+              (e.g. &ldquo;EMERGENCY&rdquo; &rarr; &ldquo;HELP&rdquo; &rarr;
               &ldquo;DOCTOR&rdquo; &rarr; &ldquo;WATER&rdquo;)...
             </span>
           ) : (
@@ -295,15 +234,6 @@ export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
                 >
                   <span className="text-xs font-mono font-bold">
                     {item.display.trim()}
-                  </span>
-                  <span
-                    className={`text-[10px] font-mono px-1 rounded ${
-                      item.priority === 'CRITICAL'
-                        ? 'bg-rose-200/80 text-rose-900'
-                        : 'bg-emerald-50 text-emerald-700'
-                    }`}
-                  >
-                    {Math.round(item.confidence * 100)}%
                   </span>
                 </div>
                 {idx < tokenHistory.length - 1 && (

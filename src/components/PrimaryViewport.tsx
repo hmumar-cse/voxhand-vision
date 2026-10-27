@@ -208,9 +208,8 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
       ctx.lineTo(bx + bw, by + bh - cornerLen);
       ctx.stroke();
 
-      // 3. Inline Tag above bounding box: [Detected Gesture: <Name>] [Score: <Confidence>%]
-      const confPct = Math.round(debounceState.confidence * 100);
-      const tagText = `[Detected Gesture: ${debounceState.displayName}]  [Score: ${confPct}%]`;
+      // 3. Inline Tag above bounding box: [Detected Gesture: <Name>]
+      const tagText = `[Detected Sign: ${debounceState.displayName}]`;
       ctx.font = '600 12px "JetBrains Mono", Consolas, monospace';
       const textWidth = ctx.measureText(tagText).width;
       const tagW = textWidth + 18;
