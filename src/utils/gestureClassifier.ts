@@ -6,6 +6,7 @@ import {
   ClassificationResult,
   DebounceState,
   CalibrationProfile,
+  SimScenarioPreset,
 } from '../types/voxhand';
 
 export const WRIST = 0;
@@ -51,11 +52,30 @@ export const DEFAULT_CALIBRATION_PROFILE: CalibrationProfile = {
   lastCalibratedAt: null,
 };
 
+export const SIM_SCENARIO_PRESETS: SimScenarioPreset[] = [
+  {
+    id: 'medical-urgent',
+    label: 'Medical Emergency',
+    sequence: ['EMERGENCY', 'PAIN', 'DOCTOR', 'HOSPITAL'],
+  },
+  {
+    id: 'daily-care',
+    label: 'Daily Care Request',
+    sequence: ['HELLO', 'PLEASE', 'WATER', 'FOOD', 'THANK_YOU'],
+  },
+  {
+    id: 'patient-comfort',
+    label: 'Patient Comfort',
+    sequence: ['HELP', 'COLD', 'TIRED', 'MEDICINE', 'CALL_FAMILY'],
+  },
+];
+
 // ----------------------------------------------------------------------------
-// MANDATORY WORD-LEVEL SIGN LANGUAGE VOCABULARY (NO LETTERWISE SPELLING)
+// 20 MANDATORY WORD-LEVEL SIGN LANGUAGE VOCABULARY (NO LETTERWISE SPELLING)
 // ----------------------------------------------------------------------------
 
 export const GESTURE_CATALOG: GestureMetadata[] = [
+  // --- EMERGENCY & MEDICAL (7 SIGNS) ---
   {
     id: 'EMERGENCY',
     name: 'EMERGENCY (Alert)',
@@ -93,6 +113,18 @@ export const GESTURE_CATALOG: GestureMetadata[] = [
     angleHint: 'Index only EXT (>155°), Thumb tucked',
   },
   {
+    id: 'HOSPITAL',
+    name: 'HOSPITAL',
+    spokenPhrase: 'Take me to the hospital.',
+    token: 'HOSPITAL ',
+    category: 'Emergency & Medical',
+    priority: 'CRITICAL',
+    description: 'Index and Middle fingers extended and pressed tightly together (ASL H-handshape) with Thumb tucked across palm.',
+    handPostureGuide: 'Extend Index + Middle pressed tightly together; tuck Thumb',
+    fingerPattern: [false, true, true, false, false],
+    angleHint: 'Index+Middle adjoined (<0.26 spread), Thumb tucked',
+  },
+  {
     id: 'PAIN',
     name: 'PAIN / HURT',
     spokenPhrase: 'I am experiencing pain.',
@@ -116,6 +148,20 @@ export const GESTURE_CATALOG: GestureMetadata[] = [
     fingerPattern: [false, false, false, false, true],
     angleHint: 'Pinky only EXT (>140°)',
   },
+  {
+    id: 'CALL_FAMILY',
+    name: 'CALL FAMILY',
+    spokenPhrase: 'Please call my family.',
+    token: 'CALL FAMILY ',
+    category: 'Emergency & Medical',
+    priority: 'HIGH',
+    description: 'Index and Pinky fingers extended upward (horned handshape) while Thumb, Middle, and Ring are curled over palm.',
+    handPostureGuide: 'Extend Index + Pinky; curl Thumb, Middle, Ring',
+    fingerPattern: [false, true, false, false, true],
+    angleHint: 'Index+Pinky EXT, Thumb/Middle/Ring CRL',
+  },
+
+  // --- DAILY NEEDS (6 SIGNS) ---
   {
     id: 'WATER',
     name: 'WATER',
@@ -159,11 +205,37 @@ export const GESTURE_CATALOG: GestureMetadata[] = [
     token: 'MORE ',
     category: 'Daily Needs',
     priority: 'STANDARD',
-    description: 'Index, Middle, and Ring curled except Index, Middle, Ring, and Pinky tips brought close to Thumb tip, or Middle+Ring+Pinky extended (OK / tapered hand).',
-    handPostureGuide: 'Pinch Thumb + Index into circle while extending Middle, Ring, Pinky',
+    description: 'Thumb and Index finger pinched in an O-ring while Middle, Ring, and Pinky are extended straight upward.',
+    handPostureGuide: 'Pinch Thumb + Index; extend Middle + Ring + Pinky',
     fingerPattern: [false, false, true, true, true],
     angleHint: 'Middle+Ring+Pinky EXT, Index+Thumb pinch',
   },
+  {
+    id: 'TIRED',
+    name: 'TIRED / REST',
+    spokenPhrase: 'I am tired and need to rest.',
+    token: 'TIRED ',
+    category: 'Daily Needs',
+    priority: 'STANDARD',
+    description: 'Middle finger extended upward while Thumb, Index, Ring, and Pinky are curled downward.',
+    handPostureGuide: 'Extend Middle finger only; curl other 4 digits',
+    fingerPattern: [false, false, true, false, false],
+    angleHint: 'Middle finger only EXT (>142°)',
+  },
+  {
+    id: 'COLD',
+    name: 'COLD / BLANKET',
+    spokenPhrase: 'I am feeling cold.',
+    token: 'COLD ',
+    category: 'Daily Needs',
+    priority: 'STANDARD',
+    description: 'Thumb, Index, and Middle fingers extended outward (3-digit spread) while Ring and Pinky are curled into palm.',
+    handPostureGuide: 'Extend Thumb + Index + Middle; curl Ring + Pinky',
+    fingerPattern: [true, true, true, false, false],
+    angleHint: 'Thumb+Index+Middle EXT, spread >0.28',
+  },
+
+  // --- CORE DIALOGUE (7 SIGNS) ---
   {
     id: 'HELLO',
     name: 'HELLO / GREETING',
@@ -201,6 +273,18 @@ export const GESTURE_CATALOG: GestureMetadata[] = [
     angleHint: 'Thumb+Pinky span >1.05 norm',
   },
   {
+    id: 'SORRY',
+    name: 'SORRY / APOLOGY',
+    spokenPhrase: 'I am sorry.',
+    token: 'SORRY ',
+    category: 'Core Dialogue',
+    priority: 'STANDARD',
+    description: 'Ring and Pinky fingers extended together while Thumb, Index, and Middle are curled over palm.',
+    handPostureGuide: 'Extend Ring + Pinky; curl Thumb, Index, Middle',
+    fingerPattern: [false, false, false, true, true],
+    angleHint: 'Ring+Pinky EXT, Thumb/Index/Middle CRL',
+  },
+  {
     id: 'YES',
     name: 'YES / CONFIRM',
     spokenPhrase: 'Yes.',
@@ -222,7 +306,7 @@ export const GESTURE_CATALOG: GestureMetadata[] = [
     description: 'Index and Middle fingers extended pressed closely together converging toward the extended Thumb.',
     handPostureGuide: 'Extend Index + Middle pressed together with Thumb',
     fingerPattern: [true, true, true, false, false],
-    angleHint: 'Index+Middle adjoined (<0.29 spread)',
+    angleHint: 'Thumb+Index+Middle adjoined (<0.28 spread)',
   },
   {
     id: 'STOP',
@@ -271,8 +355,6 @@ export function computeAngleDeg(
 
 /**
  * Extracts rotation-invariant, scale-invariant, and wrist-centered 3D features.
- * Aligning the Wrist -> Middle MCP vector vertically ensures accurate recognition
- * even when the user's hand is tilted or angled in front of the webcam.
  */
 export function extractHandFeatures(
   rawLandmarks: Point3D[],
@@ -294,7 +376,6 @@ export function extractHandFeatures(
   ]);
 
   // Step 2: Compute in-plane hand roll angle so tilted hands still classify accurately
-  // Canonical orientation has MIDDLE_MCP at (0, -1) in screen coordinates
   const midMcp = centeredPts[MIDDLE_MCP];
   const currentAngleRad = Math.atan2(midMcp[1], midMcp[0]);
   const targetAngleRad = -Math.PI / 2; // straight up
@@ -310,7 +391,7 @@ export function extractHandFeatures(
     z,
   ]);
 
-  // Step 3: Handedness normalization (ensure Index MCP is on the negative X side and Pinky MCP on positive X)
+  // Step 3: Handedness normalization
   if (normPts[INDEX_MCP][0] > normPts[PINKY_MCP][0]) {
     normPts = normPts.map(([x, y, z]) => [-x, y, z]);
   }
@@ -325,7 +406,6 @@ export function extractHandFeatures(
 
   const tipToWrist = FINGERTIP_IDS.map((id) => vecNorm(normPts[id]));
 
-  // Joint articulation angles (PIP / MCP angles)
   const fingerAngles = [
     computeAngleDeg(normPts[THUMB_CMC], normPts[THUMB_MCP], normPts[THUMB_TIP]),
     computeAngleDeg(normPts[INDEX_MCP], normPts[INDEX_PIP], normPts[INDEX_TIP]),
@@ -334,7 +414,6 @@ export function extractHandFeatures(
     computeAngleDeg(normPts[PINKY_MCP], normPts[PINKY_PIP], normPts[PINKY_TIP]),
   ];
 
-  // Continuous curl ratios: 0.0 = straight (180°), 1.0 = tightly curled (<=60°)
   const fingerCurlRatios = fingerAngles.map((ang) =>
     Math.max(0.0, Math.min(1.0, (175.0 - ang) / 110.0))
   );
@@ -383,8 +462,23 @@ export function extractHandFeatures(
 }
 
 // ----------------------------------------------------------------------------
-// 2. MULTI-FEATURE COSINE + HEURISTIC MANDATORY SIGN CLASSIFIER
+// 2. HYBRID RULE + CANONICAL PROTOTYPE COSINE CLASSIFIER (20 MANDATORY SIGNS)
 // ----------------------------------------------------------------------------
+
+// Lazily computed canonical 83-D feature prototypes for each of the 20 gestures
+let canonicalPrototypeCache: Record<GestureId, number[]> | null = null;
+
+function getCanonicalPrototypes(): Record<GestureId, number[]> {
+  if (canonicalPrototypeCache) return canonicalPrototypeCache;
+  const cache = {} as Record<GestureId, number[]>;
+  for (const g of GESTURE_CATALOG) {
+    const lms = generateCanonicalLandmarks(g.id, 0, 0);
+    const feats = extractHandFeatures(lms, DEFAULT_CALIBRATION_PROFILE);
+    cache[g.id] = buildFeatureVector(feats);
+  }
+  canonicalPrototypeCache = cache;
+  return cache;
+}
 
 export function classifyGesture(
   f: HandFeatures,
@@ -410,14 +504,19 @@ export function classifyGesture(
     NO: 0.05,
     THANK_YOU: 0.05,
     PLEASE: 0.05,
+    SORRY: 0.05,
     HELP: 0.05,
     EMERGENCY: 0.05,
     DOCTOR: 0.05,
+    HOSPITAL: 0.05,
     PAIN: 0.05,
     MEDICINE: 0.05,
+    CALL_FAMILY: 0.05,
     WATER: 0.05,
     FOOD: 0.05,
     BATHROOM: 0.05,
+    TIRED: 0.05,
+    COLD: 0.05,
     STOP: 0.05,
     MORE: 0.05,
     NONE: 0.1,
@@ -427,7 +526,7 @@ export function classifyGesture(
   if (tExt && iExt && mExt && rExt && pExt) {
     const splay = indexMiddleSpread + middleRingSpread;
     if (splay > 0.35 && thumbIndexMcpDist > 0.55) {
-      scores.HELLO = Math.min(0.98, 0.86 + 0.12 * Math.min(1.0, (splay - 0.35) / 0.35));
+      scores.HELLO = Math.min(0.98, 0.87 + 0.11 * Math.min(1.0, (splay - 0.35) / 0.35));
     } else {
       scores.THANK_YOU = 0.86;
     }
@@ -436,63 +535,95 @@ export function classifyGesture(
   // 2. THANK YOU (4 fingers straight and pressed together, thumb tucked)
   if (iExt && mExt && rExt && pExt && (!tExt || thumbPinkyMcpDist < 0.84)) {
     const adjoined = Math.max(0.0, 1.0 - (indexMiddleSpread - 0.18) / 0.35);
-    scores.THANK_YOU = Math.min(0.97, 0.85 + 0.12 * Math.min(1.0, adjoined));
+    scores.THANK_YOU = Math.min(0.97, 0.86 + 0.11 * Math.min(1.0, adjoined));
   }
 
   // 3. EMERGENCY (Thumb, Index, and Pinky extended; Middle and Ring curled)
   if (tExt && iExt && !mExt && !rExt && pExt) {
-    scores.EMERGENCY = 0.96;
+    scores.EMERGENCY = 0.97;
   }
 
-  // 4. WATER (Index, Middle, and Ring extended in W-sign; Pinky and Thumb curled)
+  // 4. CALL FAMILY (Index and Pinky extended; Thumb, Middle, and Ring curled)
+  if (!tExt && iExt && !mExt && !rExt && pExt) {
+    scores.CALL_FAMILY = 0.96;
+  }
+
+  // 5. WATER (Index, Middle, and Ring extended in W-sign; Pinky and Thumb curled)
   if (!tExt && iExt && mExt && rExt && !pExt) {
-    scores.WATER = 0.95;
+    scores.WATER = 0.96;
   }
 
-  // 5. MORE (Middle, Ring, Pinky extended; Index curled pinching Thumb in OK/F-shape)
+  // 6. MORE (Middle, Ring, Pinky extended; Index curled pinching Thumb in OK/F-shape)
   if (!iExt && mExt && rExt && pExt) {
     const pinchBonus = Math.max(0.0, 1.0 - thumbIndexTipDist / 0.55);
-    scores.MORE = Math.min(0.97, 0.86 + 0.11 * pinchBonus);
+    scores.MORE = Math.min(0.97, 0.87 + 0.10 * pinchBonus);
   }
 
-  // 6. PAIN (Thumb and Index extended at ~90 deg L-frame; Middle, Ring, Pinky curled)
+  // 7. SORRY (Ring and Pinky extended; Thumb, Index, Middle curled)
+  if (!tExt && !iExt && !mExt && rExt && pExt) {
+    scores.SORRY = 0.95;
+  }
+
+  // 8. TIRED (Middle finger extended alone; Thumb, Index, Ring, Pinky curled)
+  if (!tExt && !iExt && mExt && !rExt && !pExt) {
+    scores.TIRED = 0.95;
+  }
+
+  // 9. PAIN (Thumb and Index extended at ~90 deg L-frame; Middle, Ring, Pinky curled)
   if (tExt && iExt && !mExt && !rExt && !pExt) {
     const orthoAng = computeAngleDeg(pts[THUMB_TIP], pts[INDEX_MCP], pts[INDEX_TIP]);
     if (orthoAng >= 42.0 && orthoAng <= 135.0) {
-      scores.PAIN = Math.min(0.98, 0.86 + 0.12 * (1.0 - Math.abs(orthoAng - 85.0) / 55.0));
+      scores.PAIN = Math.min(0.98, 0.87 + 0.11 * (1.0 - Math.abs(orthoAng - 85.0) / 55.0));
     }
   }
 
-  // 7. DOCTOR (Index extended straight up alone; Thumb tucked touching curled Middle)
+  // 10. DOCTOR (Index extended straight up alone; Thumb tucked touching curled Middle)
   if (!tExt && iExt && !mExt && !rExt && !pExt) {
     const pinchBonus = Math.max(0.0, 1.0 - thumbMiddleTipDist / 0.60);
-    scores.DOCTOR = Math.min(0.96, 0.85 + 0.11 * pinchBonus);
+    scores.DOCTOR = Math.min(0.96, 0.86 + 0.10 * pinchBonus);
   }
 
-  // 8. MEDICINE (Pinky extended straight up alone; Thumb, Index, Middle, Ring curled)
+  // 11. MEDICINE (Pinky extended straight up alone; Thumb, Index, Middle, Ring curled)
   if (!tExt && !iExt && !mExt && !rExt && pExt) {
-    scores.MEDICINE = 0.95;
+    scores.MEDICINE = 0.96;
   }
 
-  // 9. PLEASE (Thumb and Pinky extended wide in Y-shape; Index, Middle, Ring curled)
+  // 12. PLEASE (Thumb and Pinky extended wide in Y-shape; Index, Middle, Ring curled)
   if (tExt && !iExt && !mExt && !rExt && pExt) {
     const spanTY = dist3D(pts[THUMB_TIP], pts[PINKY_TIP]);
-    scores.PLEASE = Math.min(0.98, 0.86 + 0.12 * Math.min(1.0, (spanTY - 1.05) / 0.6));
+    scores.PLEASE = Math.min(0.98, 0.87 + 0.11 * Math.min(1.0, (spanTY - 1.05) / 0.6));
   }
 
-  // 10. BATHROOM vs NO (Index & Middle extended, Ring & Pinky curled)
+  // 13. 2-Finger & 3-Finger Group: BATHROOM vs HOSPITAL vs COLD vs NO
   if (iExt && mExt && !rExt && !pExt) {
-    if (!tExt && indexMiddleSpread > 0.29) {
-      scores.BATHROOM = Math.min(
-        0.98,
-        0.86 + 0.12 * Math.min(1.0, (indexMiddleSpread - 0.29) / 0.32)
-      );
+    if (!tExt) {
+      if (indexMiddleSpread > 0.28) {
+        scores.BATHROOM = Math.min(
+          0.98,
+          0.87 + 0.11 * Math.min(1.0, (indexMiddleSpread - 0.28) / 0.30)
+        );
+      } else {
+        scores.HOSPITAL = Math.min(
+          0.96,
+          0.87 + 0.09 * Math.max(0.0, 1.0 - indexMiddleSpread / 0.28)
+        );
+      }
     } else {
-      scores.NO = Math.min(0.95, 0.85 + 0.10 * Math.max(0.0, 1.0 - indexMiddleSpread));
+      if (indexMiddleSpread > 0.28) {
+        scores.COLD = Math.min(
+          0.97,
+          0.87 + 0.10 * Math.min(1.0, (indexMiddleSpread - 0.28) / 0.30)
+        );
+      } else {
+        scores.NO = Math.min(
+          0.96,
+          0.86 + 0.10 * Math.max(0.0, 1.0 - indexMiddleSpread / 0.28)
+        );
+      }
     }
   }
 
-  // 11. FOOD (All 4 fingers partially flexed in a cupped C/O arc)
+  // 14. FOOD (All 4 fingers partially flexed in a cupped C/O arc)
   const meanAngle4 = (ang[1] + ang[2] + ang[3] + ang[4]) / 4.0;
   const meanMcp4 = (dMcp[1] + dMcp[2] + dMcp[3] + dMcp[4]) / 4.0;
   if (
@@ -507,27 +638,43 @@ export function classifyGesture(
     thumbIndexTipDist >= 0.28 &&
     thumbIndexTipDist <= 1.08
   ) {
-    scores.FOOD = Math.min(0.95, 0.85 + 0.10 * (1.0 - Math.abs(meanAngle4 - 112.0) / 45.0));
+    scores.FOOD = Math.min(0.96, 0.86 + 0.10 * (1.0 - Math.abs(meanAngle4 - 112.0) / 45.0));
   }
 
-  // 12. Closed-finger group: YES (Thumbs Up), HELP (Fist + Side Thumb), STOP (Compact Fist)
+  // 15. Closed-finger group: YES (Thumbs Up), HELP (Fist + Side Thumb), STOP (Compact Fist)
   if (!iExt && !mExt && !rExt && !pExt && scores.FOOD < 0.75) {
     const thumbElevation = pts[INDEX_MCP][1] - pts[THUMB_TIP][1];
     const thumbBesideIndex = thumbIndexMcpDist < 0.45;
 
     if (tExt && thumbElevation > 0.30) {
-      scores.YES = Math.min(0.97, 0.86 + Math.min(0.11, (thumbElevation - 0.30) * 0.25));
+      scores.YES = Math.min(0.97, 0.87 + Math.min(0.10, (thumbElevation - 0.30) * 0.25));
     } else if (thumbElevation > -0.06 && (thumbBesideIndex || tExt)) {
-      scores.HELP = 0.94;
+      scores.HELP = 0.95;
     } else {
       const compactness = (dWrist[1] + dWrist[2] + dWrist[3] + dWrist[4]) / 4.0;
-      scores.STOP = compactness < 1.15 ? 0.94 : 0.86;
+      scores.STOP = compactness < 1.15 ? 0.95 : 0.86;
     }
   }
 
-  // Blend with user-calibrated Cosine + Euclidean KNN snapshots for personalized accuracy
+  // Step B: Hybrid Canonical Prototype Cosine Refinement for higher real-webcam accuracy
+  const currentVec = buildFeatureVector(f);
+  const prototypes = getCanonicalPrototypes();
+  for (const g of GESTURE_CATALOG) {
+    const protoVec = prototypes[g.id];
+    if (!protoVec) continue;
+    const cosSim = computeCosineSimilarity(currentVec, protoVec);
+    // Pattern match check on the 5 fingers
+    let patternMatches = 0;
+    for (let k = 0; k < 5; k++) {
+      if (f.fingerExtended[k] === g.fingerPattern[k]) patternMatches++;
+    }
+    if (patternMatches === 5 && cosSim > 0.88) {
+      scores[g.id] = Math.max(scores[g.id], Math.min(0.98, 0.78 + (cosSim - 0.85) * 1.35));
+    }
+  }
+
+  // Step C: Blend with user-calibrated Cosine + Euclidean KNN snapshots
   if (customSamples.length > 0) {
-    const currentVec = buildFeatureVector(f);
     let bestSimilarity = 0;
     let nearestId: GestureId | null = null;
 
@@ -542,7 +689,6 @@ export function classifyGesture(
     }
 
     if (nearestId && bestSimilarity > 0.72) {
-      // Boost calibrated gesture confidence strongly when user matches their recorded snapshot
       scores[nearestId] = Math.min(
         0.99,
         Math.max(scores[nearestId], 0.35 * scores[nearestId] + 0.65 * bestSimilarity)
@@ -702,8 +848,6 @@ export class GestureHoldDebouncer {
     const token = meta ? meta.token : classification.token;
     const priority = meta ? meta.priority : classification.priority;
 
-    // If this exact gesture was already committed and is still being held, stay in COOLDOWN (latched)
-    // so it does not spam the sentence buffer or speech synthesizer every 600ms
     if (
       this.latchedGestureId === smoothedId ||
       (this.lastCommitTs > 0 && nowMs - this.lastCommitTs < this.cooldownMs)
@@ -725,7 +869,6 @@ export class GestureHoldDebouncer {
       };
     }
 
-    // Confidence gate (<80% flags amber warning)
     if (smoothedConf < this.minConfidence) {
       this.candidateId = smoothedId;
       this.holdStartTs = null;
@@ -746,7 +889,6 @@ export class GestureHoldDebouncer {
       };
     }
 
-    // High confidence (>= 80%): accumulate 600ms hold duration
     if (smoothedId !== this.candidateId || this.holdStartTs === null) {
       this.candidateId = smoothedId;
       this.holdStartTs = nowMs;
@@ -795,18 +937,39 @@ export class GestureHoldDebouncer {
 }
 
 // ----------------------------------------------------------------------------
-// 4. SYNTHETIC CANONICAL HAND GENERATOR (FOR ALL 15 MANDATORY WORD SIGNS)
+// 4. SYNTHETIC CANONICAL HAND GENERATOR + SMOOTH KINEMATIC POSE INTERPOLATION
 // ----------------------------------------------------------------------------
+
+export function interpolateLandmarks(
+  fromPts: Point3D[],
+  toPts: Point3D[],
+  alpha: number
+): Point3D[] {
+  const t = Math.max(0, Math.min(1, alpha));
+  // Cubic ease-in-out for natural biological joint motion
+  const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  return toPts.map((target, idx) => {
+    const start = fromPts[idx] || target;
+    return {
+      x: start.x + (target.x - start.x) * ease,
+      y: start.y + (target.y - start.y) * ease,
+      z: start.z + (target.z - start.z) * ease,
+    };
+  });
+}
 
 export function generateCanonicalLandmarks(
   gestureId: GestureId,
-  jitterAmount = 0.0025,
+  jitterAmount = 0.002,
   timePhase = 0
 ): Point3D[] {
   const pts: Point3D[] = Array.from({ length: 21 }, () => ({ x: 0.5, y: 0.72, z: 0.0 }));
   const setPt = (id: number, x: number, y: number, z = 0.0) => {
-    const jx = Math.sin(timePhase * 0.008 + id * 1.7) * jitterAmount;
-    const jy = Math.cos(timePhase * 0.009 + id * 2.3) * jitterAmount;
+    // Organic subtle hand sway + micro-tremor
+    const swayX = jitterAmount > 0 ? Math.sin(timePhase * 0.002) * 0.008 : 0;
+    const swayY = jitterAmount > 0 ? Math.cos(timePhase * 0.0016) * 0.006 : 0;
+    const jx = Math.sin(timePhase * 0.007 + id * 1.7) * jitterAmount + swayX;
+    const jy = Math.cos(timePhase * 0.008 + id * 2.3) * jitterAmount + swayY;
     pts[id] = {
       x: 0.5 + x * 0.19 + jx,
       y: 0.74 + y * 0.19 + jy,
@@ -869,6 +1032,13 @@ export function generateCanonicalLandmarks(
       setPt(THUMB_IP, -0.25, -0.72, -0.12);
       setPt(THUMB_TIP, -0.02, -0.78, -0.14);
       break;
+    case 'HOSPITAL':
+      straight(INDEX_MCP, 0.10, 0.96);
+      straight(MIDDLE_MCP, -0.04, 0.98);
+      [RING_MCP, PINKY_MCP].forEach((m) => curled(m, true));
+      setPt(THUMB_IP, -0.20, -0.68, -0.15);
+      setPt(THUMB_TIP, 0.04, -0.76, -0.18);
+      break;
     case 'PAIN':
       straight(INDEX_MCP, 0.0, 0.98);
       [MIDDLE_MCP, RING_MCP, PINKY_MCP].forEach((m) => curled(m, true));
@@ -880,6 +1050,14 @@ export function generateCanonicalLandmarks(
       straight(PINKY_MCP, 0.12, 0.92);
       setPt(THUMB_IP, -0.22, -0.68, -0.14);
       setPt(THUMB_TIP, 0.02, -0.75, -0.16);
+      break;
+    case 'CALL_FAMILY':
+      straight(INDEX_MCP, -0.10, 0.96);
+      curled(MIDDLE_MCP, true);
+      curled(RING_MCP, true);
+      straight(PINKY_MCP, 0.24, 0.90);
+      setPt(THUMB_IP, -0.22, -0.68, -0.14);
+      setPt(THUMB_TIP, 0.05, -0.74, -0.16);
       break;
     case 'WATER':
       straight(INDEX_MCP, -0.15, 0.96);
@@ -909,6 +1087,21 @@ export function generateCanonicalLandmarks(
       setPt(THUMB_IP, -0.45, -0.72, -0.12);
       setPt(THUMB_TIP, -0.34, -0.76, -0.12);
       break;
+    case 'TIRED':
+      curled(INDEX_MCP, true);
+      straight(MIDDLE_MCP, 0.0, 1.0);
+      curled(RING_MCP, true);
+      curled(PINKY_MCP, true);
+      setPt(THUMB_IP, -0.22, -0.68, -0.14);
+      setPt(THUMB_TIP, 0.02, -0.75, -0.16);
+      break;
+    case 'COLD':
+      straight(INDEX_MCP, -0.26, 0.96);
+      straight(MIDDLE_MCP, 0.25, 1.0);
+      [RING_MCP, PINKY_MCP].forEach((m) => curled(m, true));
+      setPt(THUMB_IP, -0.82, -0.54, -0.05);
+      setPt(THUMB_TIP, -1.15, -0.58, -0.05);
+      break;
     case 'HELLO':
       straight(INDEX_MCP, -0.26, 0.96);
       straight(MIDDLE_MCP, -0.04, 1.02);
@@ -930,6 +1123,13 @@ export function generateCanonicalLandmarks(
       straight(PINKY_MCP, 0.36, 0.90);
       setPt(THUMB_IP, -0.82, -0.54, -0.05);
       setPt(THUMB_TIP, -1.16, -0.58, -0.05);
+      break;
+    case 'SORRY':
+      [INDEX_MCP, MIDDLE_MCP].forEach((m) => curled(m, true));
+      straight(RING_MCP, 0.12, 0.95);
+      straight(PINKY_MCP, 0.28, 0.88);
+      setPt(THUMB_IP, -0.22, -0.68, -0.14);
+      setPt(THUMB_TIP, 0.02, -0.75, -0.16);
       break;
     case 'YES':
       [INDEX_MCP, MIDDLE_MCP, RING_MCP, PINKY_MCP].forEach((m) => curled(m, true));

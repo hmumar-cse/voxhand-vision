@@ -242,7 +242,7 @@ export const TranslationConsole: React.FC<TranslationConsoleProps> = ({
         <div className="mt-3 flex items-center justify-between text-[11px] font-mono text-slate-500">
           <span>Manual Speech Trigger: Speaks only when button is pressed</span>
           <span className="text-slate-700 font-semibold">
-            15 Mandatory Word Signs
+            20 Mandatory Word Signs
           </span>
         </div>
       </div>

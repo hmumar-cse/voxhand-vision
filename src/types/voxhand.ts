@@ -10,14 +10,19 @@ export type GestureId =
   | 'NO'
   | 'THANK_YOU'
   | 'PLEASE'
+  | 'SORRY'
   | 'HELP'
   | 'EMERGENCY'
   | 'DOCTOR'
+  | 'HOSPITAL'
   | 'PAIN'
   | 'MEDICINE'
+  | 'CALL_FAMILY'
   | 'WATER'
   | 'FOOD'
   | 'BATHROOM'
+  | 'TIRED'
+  | 'COLD'
   | 'STOP'
   | 'MORE'
   | 'NONE';
@@ -40,7 +45,7 @@ export interface GestureMetadata {
 export interface CalibrationProfile {
   isCalibrated: boolean;
   referencePalmSpan: number | null;
-  curlAngleThresholdDeg: number; // default 135 deg
+  curlAngleThresholdDeg: number; // default 136 deg
   extensionRatioThreshold: number; // default 0.65
   rotationInvariant: boolean;
   lastCalibratedAt: string | null;
@@ -108,4 +113,10 @@ export interface AccumulatedToken {
   priority: 'CRITICAL' | 'HIGH' | 'STANDARD';
   confidence: number;
   timestamp: string;
+}
+
+export interface SimScenarioPreset {
+  id: string;
+  label: string;
+  sequence: GestureId[];
 }

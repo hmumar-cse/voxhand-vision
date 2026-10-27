@@ -7,9 +7,11 @@ import {
   FlipHorizontal,
   Pause,
   Play,
+  PlayCircle,
   RotateCcw,
   Sparkles,
   Sliders,
+  Square,
 } from 'lucide-react';
 import {
   DebounceState,
@@ -22,6 +24,7 @@ import {
   GESTURE_CATALOG,
   HAND_CONNECTIONS,
   MIDDLE_MCP,
+  SIM_SCENARIO_PRESETS,
   WRIST,
 } from '../utils/gestureClassifier';
 
@@ -36,6 +39,7 @@ interface PrimaryViewportProps {
   isPaused: boolean;
   isSimulating: boolean;
   simulatedGesture: GestureId;
+  activeScenarioId: string | null;
   onStartCamera: () => void;
   onStopCamera: () => void;
   onToggleMirror: () => void;
@@ -44,6 +48,8 @@ interface PrimaryViewportProps {
   onResetBuffer: () => void;
   onToggleSimulation: () => void;
   onSelectSimGesture: (id: GestureId) => void;
+  onPlayScenario: (scenarioId: string, sequence: GestureId[]) => void;
+  onStopScenario: () => void;
   cameraError: string | null;
 }
 
@@ -58,6 +64,7 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
   isPaused,
   isSimulating,
   simulatedGesture,
+  activeScenarioId,
   onStartCamera,
   onStopCamera,
   onToggleMirror,
@@ -66,6 +73,8 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
   onResetBuffer,
   onToggleSimulation,
   onSelectSimGesture,
+  onPlayScenario,
+  onStopScenario,
   cameraError,
 }) => {
   // Draw overlay on canvas whenever features or debounceState updates
@@ -113,7 +122,7 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
       }
     }
 
-    if (features) {
+    if (features && showLandmarks) {
       // Map normalized coordinates to canvas dimensions (respecting mirror setting)
       const pts: [number, number][] = features.rawPts.map((p) => [
         (isMirrored ? 1.0 - p[0] : p[0]) * w,
@@ -124,52 +133,67 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
       const isEmergency =
         debounceState.priority === 'CRITICAL' && isHighConf;
 
-      // 1. Draw Skeletal Landmark Overlay (if enabled)
-      if (showLandmarks) {
-        // Joint connecting bones with subtle glow
-        ctx.save();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = isEmergency
-          ? '#f43f5e'
-          : isHighConf
-          ? '#10b981'
-          : '#f59e0b';
-        ctx.shadowColor = isEmergency
-          ? 'rgba(244, 63, 94, 0.45)'
-          : isHighConf
-          ? 'rgba(16, 185, 129, 0.45)'
-          : 'rgba(245, 158, 11, 0.4)';
-        ctx.shadowBlur = 8;
+      // 1. Draw translucent palm anatomical polygon for realistic depth
+      const palmIndices = [0, 1, 5, 9, 13, 17];
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[palmIndices[0]][0], pts[palmIndices[0]][1]);
+      for (let i = 1; i < palmIndices.length; i++) {
+        ctx.lineTo(pts[palmIndices[i]][0], pts[palmIndices[i]][1]);
+      }
+      ctx.closePath();
+      ctx.fillStyle = isEmergency
+        ? 'rgba(244, 63, 94, 0.14)'
+        : 'rgba(16, 185, 129, 0.14)';
+      ctx.fill();
+      ctx.restore();
 
-        for (const [a, b] of HAND_CONNECTIONS) {
-          ctx.beginPath();
-          ctx.moveTo(pts[a][0], pts[a][1]);
-          ctx.lineTo(pts[b][0], pts[b][1]);
-          ctx.stroke();
-        }
-        ctx.restore();
+      // 2. Joint connecting bones with subtle depth-modulated glow
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = isEmergency
+        ? '#f43f5e'
+        : isHighConf
+        ? '#10b981'
+        : '#f59e0b';
+      ctx.shadowColor = isEmergency
+        ? 'rgba(244, 63, 94, 0.5)'
+        : isHighConf
+        ? 'rgba(16, 185, 129, 0.5)'
+        : 'rgba(245, 158, 11, 0.4)';
+      ctx.shadowBlur = 10;
 
-        // 21 Landmark Nodes
-        for (let i = 0; i < pts.length; i++) {
-          const [px, py] = pts[i];
-          const isWrist = i === WRIST;
-          const isTip = FINGERTIP_IDS.includes(i);
-          const radius = isWrist ? 6.5 : isTip ? 5.5 : 4;
+      for (const [a, b] of HAND_CONNECTIONS) {
+        const zAvg = (features.rawPts[a][2] + features.rawPts[b][2]) * 0.5;
+        ctx.lineWidth = Math.max(2.2, Math.min(4.2, 3.2 - zAvg * 4));
+        ctx.beginPath();
+        ctx.moveTo(pts[a][0], pts[a][1]);
+        ctx.lineTo(pts[b][0], pts[b][1]);
+        ctx.stroke();
+      }
+      ctx.restore();
 
-          ctx.beginPath();
-          ctx.arc(px, py, radius, 0, Math.PI * 2);
-          ctx.fillStyle = isWrist
-            ? '#ef4444'
-            : isTip
-            ? '#38bdf8'
-            : i === MIDDLE_MCP
-            ? '#a855f7'
-            : '#f8fafc';
-          ctx.fill();
-          ctx.lineWidth = 1.5;
-          ctx.strokeStyle = '#0f172a';
-          ctx.stroke();
-        }
+      // 3. 21 Landmark Nodes
+      for (let i = 0; i < pts.length; i++) {
+        const [px, py] = pts[i];
+        const isWrist = i === WRIST;
+        const isTip = FINGERTIP_IDS.includes(i);
+        const radius = isWrist ? 7 : isTip ? 6 : 4.2;
+
+        ctx.beginPath();
+        ctx.arc(px, py, radius, 0, Math.PI * 2);
+        ctx.fillStyle = isWrist
+          ? '#ef4444'
+          : isTip
+          ? '#38bdf8'
+          : i === MIDDLE_MCP
+          ? '#a855f7'
+          : '#f8fafc';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#0f172a';
+        ctx.stroke();
       }
     }
 
@@ -235,13 +259,13 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
       </div>
 
       {/* Video & Absolute Canvas Container */}
-      <div className="relative flex-1 bg-slate-950 min-h-[390px] sm:min-h-[460px] flex items-center justify-center overflow-hidden">
+      <div className="relative flex-1 bg-slate-950 min-h-[380px] sm:min-h-[430px] flex items-center justify-center overflow-hidden">
         {/* Mirrored Live Camera Feed */}
         <video
           ref={videoRef}
           playsInline
           muted
-          className={`w-full h-full object-contain max-h-[540px] transition-opacity duration-200 ${
+          className={`w-full h-full object-contain max-h-[520px] transition-opacity duration-200 ${
             isWebcamLive && !isSimulating
               ? 'opacity-100'
               : 'opacity-0 pointer-events-none absolute'
@@ -260,17 +284,18 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
         <div className="absolute top-3.5 left-3.5 flex flex-wrap items-center gap-2 pointer-events-none">
           <div className="px-3 py-1.5 rounded-lg bg-slate-900/85 backdrop-blur-md border border-slate-700/80 text-[11px] font-mono text-slate-200 flex items-center gap-2.5 shadow-md">
             <span>
-              HOLD BUFFER:{' '}
+              ACTIVE SIGN:{' '}
               <strong className="text-emerald-400">
-                {Math.round(debounceState.holdDurationMs)}ms
-              </strong>{' '}
-              / {debounceState.requiredHoldMs}ms
+                {debounceState.candidateId !== 'NONE'
+                  ? debounceState.candidateId
+                  : 'IDLE'}
+              </strong>
             </span>
             <span className="text-slate-600">|</span>
             <span>
-              SPAN:{' '}
+              HOLD:{' '}
               <strong className="text-sky-300">
-                {features ? features.palmSpan.toFixed(3) : '0.000'}
+                {Math.round(debounceState.holdDurationMs)}ms
               </strong>
             </span>
             {features && (
@@ -392,15 +417,54 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
         </div>
       </div>
 
-      {/* Kinematic Simulation Selector Bar */}
+      {/* Kinematic Simulation Console (Multi-Sign Scenario Sequencer + 20 Mandatory Sign Injector) */}
       {isSimulating && (
-        <div className="px-4 py-2.5 bg-slate-50/90 border-t border-slate-200/90 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-mono text-slate-600">
-            <Sliders className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="font-bold text-slate-800">INJECT SIGN:</span>
+        <div className="px-4 py-3 bg-slate-50/95 border-t border-slate-200/90 space-y-2.5">
+          {/* Row 1: Automated Multi-Sign Scenario Sequencer */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/70">
+            <div className="flex items-center gap-1.5 text-xs font-mono text-slate-700">
+              <PlayCircle className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="font-bold">AUTO-SEQUENCE SCENARIOS:</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {SIM_SCENARIO_PRESETS.map((sc) => {
+                const isRunning = activeScenarioId === sc.id;
+                return (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    onClick={() =>
+                      isRunning
+                        ? onStopScenario()
+                        : onPlayScenario(sc.id, sc.sequence)
+                    }
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-semibold border transition-all cursor-pointer ${
+                      isRunning
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-emerald-50 border-slate-200 text-slate-700'
+                    }`}
+                    title={`Smoothly animate and commit: ${sc.sequence.join(' -> ')}`}
+                  >
+                    {isRunning ? (
+                      <Square className="w-3 h-3 fill-current" />
+                    ) : (
+                      <Play className="w-3 h-3 fill-current text-emerald-600" />
+                    )}
+                    <span>{sc.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
+          {/* Row 2: Individual Mandatory Sign Pose Injector (20 Signs) */}
           <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1 text-[11px] font-mono text-slate-600 mr-1">
+              <Sliders className="w-3 h-3 text-indigo-600" />
+              <span className="font-bold text-slate-800">POSE (20):</span>
+            </div>
+
             {GESTURE_CATALOG.map((g) => {
               const isSelected = simulatedGesture === g.id;
               const isEmergency = g.priority === 'CRITICAL';
@@ -409,7 +473,7 @@ export const PrimaryViewport: React.FC<PrimaryViewportProps> = ({
                   key={g.id}
                   type="button"
                   onClick={() => onSelectSimGesture(g.id)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all cursor-pointer ${
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-mono transition-all cursor-pointer ${
                     isSelected
                       ? isEmergency
                         ? 'bg-rose-600 text-white font-bold shadow-xs'

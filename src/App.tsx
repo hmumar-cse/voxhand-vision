@@ -20,6 +20,7 @@ import {
   extractHandFeatures,
   generateCanonicalLandmarks,
   GestureHoldDebouncer,
+  interpolateLandmarks,
 } from './utils/gestureClassifier';
 
 declare global {
@@ -43,7 +44,7 @@ export const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const debouncerRef = useRef<GestureHoldDebouncer>(
-    new GestureHoldDebouncer(600, 0.80, 450)
+    new GestureHoldDebouncer(600, 0.80, 600)
   );
 
   // Camera & Simulation state
@@ -51,16 +52,25 @@ export const App: React.FC = () => {
   const [isSimulating, setIsSimulating] = useState(true);
   const [simulatedGesture, setSimulatedGesture] =
     useState<GestureId>('EMERGENCY');
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [isMirrored, setIsMirrored] = useState(true);
   const [showLandmarks, setShowLandmarks] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
+  // Smooth kinematic transition refs for SimBench
+  const prevSimLandmarksRef = useRef<Point3D[]>(
+    generateCanonicalLandmarks('EMERGENCY', 0, 0)
+  );
+  const targetSimGestureRef = useRef<GestureId>('EMERGENCY');
+  const transitionStartTsRef = useRef<number>(0);
+  const scenarioTimerRef = useRef<number | null>(null);
+
   // Telemetry & Vision state
   const [telemetry, setTelemetry] = useState<TelemetryMetrics>({
     cameraStatus: 'SIMULATION',
     fps: 60,
-    inferenceLatencyMs: 2.1,
+    inferenceLatencyMs: 1.9,
     trackingState: 'TRACKING',
     hardwareBridgeMode: 'OPTICAL_VISION',
   });
@@ -202,6 +212,8 @@ export const App: React.FC = () => {
 
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const speechWatchdogRef = useRef<number | null>(null);
+  const lastCommitWallTimeRef = useRef<number>(0);
+  const hasSpokenSinceLastCommitRef = useRef<boolean>(true);
 
   const clearSpeechWatchdog = () => {
     if (speechWatchdogRef.current !== null) {
@@ -234,7 +246,6 @@ export const App: React.FC = () => {
     const raw = (textToSpeak ?? stateRef.current.sentenceBuffer).trim();
     if (!raw) return;
 
-    // Mark any pending auto-speak pause timer as satisfied so it doesn't interrupt manual speech
     hasSpokenSinceLastCommitRef.current = true;
     lastCommitWallTimeRef.current = 0;
     setPauseProgressMs(0);
@@ -280,8 +291,6 @@ export const App: React.FC = () => {
     window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
 
-    // Watchdog sync: in Chromium/Windows, onend can occasionally be dropped after cancel().
-    // Poll speechSynthesis.speaking after a 350ms startup grace period to guarantee UI state sync.
     const startedAt = performance.now();
     speechWatchdogRef.current = window.setInterval(() => {
       if (activeUtteranceRef.current !== utterance) {
@@ -301,11 +310,8 @@ export const App: React.FC = () => {
   }, []);
 
   // --------------------------------------------------------------------------
-  // 2. COMMITTED GESTURE HANDLER & 1.5s SENTENCE COMPLETION AUTO-SPEAK
+  // 2. COMMITTED GESTURE HANDLER & OPTIONAL AUTO-SPEAK
   // --------------------------------------------------------------------------
-
-  const lastCommitWallTimeRef = useRef<number>(0);
-  const hasSpokenSinceLastCommitRef = useRef<boolean>(true);
 
   const appendCommittedGesture = useCallback(
     (
@@ -333,7 +339,6 @@ export const App: React.FC = () => {
         return next;
       });
 
-      // Speak immediately if user enabled "Speak Every Committed Sign Immediately"
       if (stateRef.current.speakImmediateOnCommit) {
         triggerSpeech(spokenPhrase || token);
       }
@@ -345,7 +350,7 @@ export const App: React.FC = () => {
     [triggerSpeech]
   );
 
-  // Monitor 1.5s pause after commit to auto-trigger full sentence TTS when Auto-Speak is active
+  // Monitor 1.5s pause after commit to auto-trigger full sentence TTS only if Auto-Speak is enabled
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (
@@ -386,7 +391,6 @@ export const App: React.FC = () => {
     ) => {
       const t0 = performance.now();
 
-      // Calculate rolling FPS
       const times = fpsFrameTimesRef.current;
       times.push(nowMs);
       while (times.length > 0 && nowMs - times[0] > 1000) {
@@ -445,27 +449,100 @@ export const App: React.FC = () => {
   );
 
   // --------------------------------------------------------------------------
-  // 4. SYNTHETIC KINEMATIC SIMULATION LOOP (WHEN SIMBENCH IS ENABLED)
+  // 4. SMOOTH INTERPOLATED KINEMATIC SIMULATION LOOP & SCENARIO SEQUENCER
   // --------------------------------------------------------------------------
+
+  const selectSimGestureSmooth = useCallback((nextId: GestureId) => {
+    if (features && features.rawPts.length === 21) {
+      prevSimLandmarksRef.current = features.rawPts.map(([x, y, z]) => ({
+        x,
+        y,
+        z,
+      }));
+    } else {
+      prevSimLandmarksRef.current = generateCanonicalLandmarks(
+        targetSimGestureRef.current,
+        0,
+        0
+      );
+    }
+    targetSimGestureRef.current = nextId;
+    transitionStartTsRef.current = performance.now();
+    debouncerRef.current.releaseLatch();
+    setSimulatedGesture(nextId);
+  }, [features]);
+
+  const stopScenario = useCallback(() => {
+    if (scenarioTimerRef.current !== null) {
+      window.clearInterval(scenarioTimerRef.current);
+      scenarioTimerRef.current = null;
+    }
+    setActiveScenarioId(null);
+  }, []);
+
+  const playScenario = useCallback(
+    (scenarioId: string, sequence: GestureId[]) => {
+      stopScenario();
+      if (sequence.length === 0) return;
+
+      setIsSimulating(true);
+      setIsPaused(false);
+      setActiveScenarioId(scenarioId);
+
+      let stepIdx = 0;
+      selectSimGestureSmooth(sequence[0]);
+
+      // Advance to the next sign every 1350ms (320ms smooth morph + 600ms hold commit + margin)
+      scenarioTimerRef.current = window.setInterval(() => {
+        stepIdx += 1;
+        if (stepIdx >= sequence.length) {
+          stopScenario();
+          return;
+        }
+        selectSimGestureSmooth(sequence[stepIdx]);
+      }, 1350);
+    },
+    [selectSimGestureSmooth, stopScenario]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (scenarioTimerRef.current !== null) {
+        window.clearInterval(scenarioTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isSimulating) return;
 
     let animId = 0;
     let lastTick = performance.now();
+    const TRANSITION_MS = 300;
 
     const loop = (now: number) => {
       animId = requestAnimationFrame(loop);
-      if (now - lastTick < 30) return; // ~33 FPS steady cadence
+      if (now - lastTick < 28) return; // ~35 FPS steady cadence
       lastTick = now;
 
       if (stateRef.current.isPaused) return;
 
-      const syntheticPts = generateCanonicalLandmarks(
+      const targetPts = generateCanonicalLandmarks(
         stateRef.current.simulatedGesture,
-        0.0025,
+        0.002,
         now
       );
+
+      const elapsedTransition = now - transitionStartTsRef.current;
+      const syntheticPts =
+        elapsedTransition < TRANSITION_MS
+          ? interpolateLandmarks(
+              prevSimLandmarksRef.current,
+              targetPts,
+              elapsedTransition / TRANSITION_MS
+            )
+          : targetPts;
+
       processLandmarksFrame(syntheticPts, now, 'SIMULATION');
     };
 
@@ -493,6 +570,7 @@ export const App: React.FC = () => {
   }, []);
 
   const startWebcam = useCallback(async () => {
+    stopScenario();
     setCameraError(null);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -567,13 +645,14 @@ export const App: React.FC = () => {
       setIsWebcamRunning(false);
       setIsSimulating(true);
     }
-  }, [processLandmarksFrame]);
+  }, [processLandmarksFrame, stopScenario]);
 
   // --------------------------------------------------------------------------
   // 6. UI ACTION & PRECISION CALIBRATION HANDLERS
   // --------------------------------------------------------------------------
 
   const handleResetBuffer = () => {
+    stopScenario();
     debouncerRef.current.reset();
     setTokenHistory([]);
     setSentenceBuffer('');
@@ -582,59 +661,12 @@ export const App: React.FC = () => {
   };
 
   const handleRunQuickWordDemo = () => {
-    const demoWords: {
-      id: GestureId;
-      word: string;
-      phrase: string;
-      priority: 'CRITICAL' | 'HIGH' | 'STANDARD';
-      conf: number;
-    }[] = [
-      {
-        id: 'EMERGENCY',
-        word: 'EMERGENCY',
-        phrase: 'Emergency! I need immediate assistance.',
-        priority: 'CRITICAL',
-        conf: 0.97,
-      },
-      {
-        id: 'HELP',
-        word: 'HELP',
-        phrase: 'Please help me.',
-        priority: 'CRITICAL',
-        conf: 0.95,
-      },
-      {
-        id: 'DOCTOR',
-        word: 'DOCTOR',
-        phrase: 'I need a doctor.',
-        priority: 'CRITICAL',
-        conf: 0.96,
-      },
-      {
-        id: 'WATER',
-        word: 'WATER',
-        phrase: 'I would like some water.',
-        priority: 'STANDARD',
-        conf: 0.94,
-      },
-    ];
-
-    setTokenHistory(
-      demoWords.map((item, i) => ({
-        id: `demo-${Date.now()}-${i}`,
-        gestureId: item.id,
-        display: item.word,
-        spokenPhrase: item.phrase,
-        priority: item.priority,
-        confidence: item.conf,
-        timestamp: new Date().toLocaleTimeString(),
-      }))
-    );
-
-    const nextSentence = 'EMERGENCY HELP DOCTOR WATER ';
-    setSentenceBuffer(nextSentence);
-    lastCommitWallTimeRef.current = performance.now();
-    hasSpokenSinceLastCommitRef.current = false;
+    playScenario('medical-urgent', [
+      'EMERGENCY',
+      'PAIN',
+      'DOCTOR',
+      'HOSPITAL',
+    ]);
   };
 
   const handleCalibrateDistanceAndNeutral = () => {
@@ -671,7 +703,6 @@ export const App: React.FC = () => {
   const handleAutoCalibrateCurrentPose = (gestureId: GestureId) => {
     if (!features) return;
     const baseVec = buildFeatureVector(features);
-    // Capture 5 slightly perturbed vectors around the live hand posture for robust KNN + Cosine matching
     const burst = Array.from({ length: 5 }, (_, idx) => ({
       gestureId,
       vector: baseVec.map((v, i) => v + Math.sin(idx * 1.9 + i) * 0.004),
@@ -691,9 +722,9 @@ export const App: React.FC = () => {
   };
 
   const handleInjectGestureInSim = (gestureId: GestureId) => {
-    debouncerRef.current.releaseLatch();
+    stopScenario();
     setIsSimulating(true);
-    setSimulatedGesture(gestureId);
+    selectSimGestureSmooth(gestureId);
   };
 
   return (
@@ -728,17 +759,23 @@ export const App: React.FC = () => {
               isPaused={isPaused}
               isSimulating={isSimulating}
               simulatedGesture={simulatedGesture}
+              activeScenarioId={activeScenarioId}
               onStartCamera={startWebcam}
               onStopCamera={stopWebcam}
               onToggleMirror={() => setIsMirrored((m) => !m)}
               onToggleLandmarks={() => setShowLandmarks((s) => !s)}
               onTogglePause={() => setIsPaused((p) => !p)}
               onResetBuffer={handleResetBuffer}
-              onToggleSimulation={() => setIsSimulating((s) => !s)}
-              onSelectSimGesture={(id) => {
-                debouncerRef.current.releaseLatch();
-                setSimulatedGesture(id);
+              onToggleSimulation={() => {
+                stopScenario();
+                setIsSimulating((s) => !s);
               }}
+              onSelectSimGesture={(id) => {
+                stopScenario();
+                selectSimGestureSmooth(id);
+              }}
+              onPlayScenario={playScenario}
+              onStopScenario={stopScenario}
               cameraError={cameraError}
             />
           </div>
@@ -772,7 +809,7 @@ export const App: React.FC = () => {
           speakImmediateOnCommit={speakImmediateOnCommit}
           onToggleSpeakImmediate={() => setSpeakImmediateOnCommit((s) => !s)}
           isSpeaking={isSpeaking}
-          onSpeakNow={() => triggerSpeech()}
+          onSpeakNow={() => triggerSpeech(sentenceBuffer)}
           onStopSpeaking={stopSpeech}
           speechVolume={speechVolume}
           isMuted={isMuted}
